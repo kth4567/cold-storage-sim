@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>冷库数字孪生 · Python 物理仿真</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div id="alarmBanner"></div>
+
+  <div id="environment" class="panel">
+    <h2>环境参数 <small id="simClock">仿真 0:00</small></h2>
+    <div class="row"><span>库内温度</span><span class="value" id="tIn">--</span></div>
+    <div class="row"><span>库内湿度</span><span class="value" id="rhIn">--</span></div>
+    <div class="row"><span>货物温度</span><span class="value" id="tProd">--</span></div>
+    <div class="row"><span>库外温度</span><span class="value" id="tOut">--</span></div>
+    <div class="row"><span>库外湿度</span><span class="value" id="rhOut">--</span></div>
+    <div class="row"><span>开门冷损</span><span class="value" id="qDoor">--</span></div>
+    <div class="row"><span>围护传热</span><span class="value" id="qEnv">--</span></div>
+  </div>
+
+  <div id="equipment" class="panel">
+    <h2>设备状态</h2>
+    <div class="row"><span>压缩机机组</span><span class="status-dot" id="compDot"></span><span class="value" id="compState">--</span></div>
+    <div class="row"><span>制冷量</span><span class="value" id="qCool">--</span></div>
+    <div class="row"><span>电功率</span><span class="value" id="power">--</span></div>
+    <div class="row"><span>能效比 COP</span><span class="value" id="cop">--</span></div>
+    <div class="row"><span>蒸发器温度</span><span class="value" id="tEvap">--</span></div>
+    <div class="row"><span>盘管结霜</span><span class="value" id="frost">--</span></div>
+    <div class="row"><span>累计电耗</span><span class="value" id="energy">--</span></div>
+    <div class="row"><span>库门状态</span><span class="status-dot" id="doorDot"></span><span class="value" id="doorState">关闭</span></div>
+  </div>
+
+  <div id="controls" class="panel">
+    <h2 style="flex-basis:100%">仿真控制</h2>
+    <button data-speed="1">时间 1×</button>
+    <button data-speed="30" class="active">时间 30×</button>
+    <button data-speed="120">时间 120×</button>
+    <button id="defrostBtn">手动化霜 [T]</button>
+    <button id="resetBtn">复位场景 [R]</button>
+    <button id="spawnBtn">生成货箱 [G]</button>
+  </div>
+
+  <div id="chartBox">
+    <div class="title">库温趋势 ─ 实线:库内 · 虚线:设定点 -18°C</div>
+    <canvas id="chart" width="260" height="110"></canvas>
+  </div>
+
+  <div id="crosshair"><span class="ring"></span></div>
+  <div id="targetLabel"></div>
+
+  <div id="hint">
+    <span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> 移动</span>
+    <span><span class="key">Shift</span> 奔跑</span>
+    <span><span class="key">空格</span> 跳跃</span>
+    <span><span class="key">E</span> 开关门</span>
+    <span><span class="key">F</span> 抓取/放下</span>
+    <span><span class="key">左键</span> 投掷</span>
+    <span><span class="key">G</span> 生成货箱</span>
+    <span><span class="key">Esc</span> 释放鼠标</span>
+  </div>
+
+  <div id="miniMap">
+    <div id="miniPlayer"></div>
+    <div id="miniDoor"></div>
+  </div>
+
+  <div id="connDot"><i></i><span id="connText">连接中…</span></div>
+
+  <div id="start">
+    <div class="card">
+      <button id="startBtn">进入冷库巡检</button>
+      <div class="sub">后端 Python + MuJoCo 物理引擎驱动 · 刚体动力学 + 冷库热力学实时仿真<br/>货箱可推动 / 抓取 / 投掷，开门会引入真实热湿负荷</div>
+    </div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/": "./vendor/addons/"
+      }
+    }
+  </script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
