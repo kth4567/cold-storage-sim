@@ -8,15 +8,20 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 A first-person 3D cold storage facility simulation where **everything is real physics,
-computed in Python**: a MuJoCo rigid-body world (a hinged freezer door you can jam with
-crates, boxes you can shove, grab and throw) coupled with a first-principles refrigeration
-thermodynamics model (door-open air infiltration, compressor cycling, evaporator frosting
-and defrost). The browser only renders — the entire simulated world lives on the server
-and is streamed over WebSocket at 30 Hz.
+computed in Python**: a MuJoCo rigid-body world (a servo-driven sliding freezer door you
+can jam with crates, boxes you can shove, grab and throw) coupled with a first-principles
+refrigeration thermodynamics model (door-open air infiltration tempered by a vestibule and
+air curtain, compressor cycling, evaporator frosting and defrost). The 14 × 18 × 6 m
+freezer hall stores 40 t of frozen goods on 8 rack lines, cooled by two ceiling-mounted
+unit coolers (6 fans, 52 kW rated) under fully modeled services — refrigerant piping,
+fire sprinklers, cable trays and conduit. The browser only renders — the entire simulated
+world lives on the server and is streamed over WebSocket at 30 Hz.
 
-| Exterior at dusk | Inside the freezer | Cold air spilling out |
-| --- | --- | --- |
-| ![](docs/screenshots/exterior.png) | ![](docs/screenshots/interior.png) | ![](docs/screenshots/door-open.png) |
+| Exterior at dusk | Inside the freezer hall |
+| --- | --- |
+| ![](docs/screenshots/exterior.png) | ![](docs/screenshots/interior.png) |
+| **Ceiling unit coolers & services** | **Cold air spilling out** |
+| ![](docs/screenshots/ceiling.png) | ![](docs/screenshots/door-open.png) |
 
 > **For AI assistants / anyone deploying this:** the three commands under
 > **Quick Start** are all you need. No build step, no database, no GPU on the server,
@@ -67,7 +72,7 @@ curl http://127.0.0.1:8017/api/state    # should return a JSON snapshot
 | --- | --- |
 | Click "进入冷库巡检" | Enter first-person mode (pointer lock) |
 | W / A / S / D + mouse | Move / look (Shift to run, Space to jump) |
-| E | Open / close the door (it has real mass and inertia — a crate in the doorway will jam it) |
+| E | Open / close the sliding door (servo-driven, real mass — a crate in the doorway will jam it) |
 | F | Grab / release the crate, barrel or ball under your crosshair |
 | Left click | Throw the held object |
 | G | Spawn a new crate in front of you |
@@ -76,12 +81,14 @@ curl http://127.0.0.1:8017/api/state    # should return a JSON snapshot
 | 1 / 2 / 3 | Thermodynamics time scale 1× / 30× / 120× |
 | Esc | Release the mouse (to use the control panel buttons) |
 
-**Suggested tour:** press `2` (30× time), open the door with `E`, and watch the
-infiltration load spike past 100 kW on the HUD while the room temperature climbs,
-fog pours out through the PVC strip curtain and alarms fire. Close the door and watch
-the compressor claw the temperature back down; the moisture you let in frosts up the
-evaporator coil, and past 8 kg of frost a defrost cycle kicks in automatically.
-Throw a crate into the doorway and try to close the door on it.
+**Suggested tour:** press `2` (30× time), slide the door open with `E`, and watch the
+infiltration load jump past 50 kW on the HUD (the vestibule and air curtain are all
+that keep it from tripling) while the room temperature climbs, fog pours out through
+the PVC strip curtain and the over-temperature / door-open alarms fire. Close the door
+and watch the compressor claw the temperature back down; the moisture you let in frosts
+up the evaporator coil, and past 8 kg of frost a defrost cycle kicks in automatically —
+the ceiling fans stop spinning while it runs. Throw a crate into the doorway and try
+to close the door on it.
 
 ---
 
@@ -91,14 +98,15 @@ Throw a crate into the doorway and try to close the door on it.
 Browser (Three.js rendering + input only)
         ↕ WebSocket, 30 Hz state stream / commands
 Python backend (FastAPI, 60 Hz main loop)
-        ├── MuJoCo 3.x rigid-body physics: hinged servo-driven door / 12+ crates /
+        ├── MuJoCo 3.x rigid-body physics: servo-driven sliding door / 12+ crates /
         │   barrels / ball / kinematic player collider (shove crates around) /
         │   PD-force grabbing / throwing
-        └── Thermodynamics: envelope conduction + Gosney-Olama door infiltration +
-            thermostat-cycled compressor (Carnot-derated COP) + evaporator
-            frosting & electric defrost + Magnus humidity balance + product
-            thermal mass — door opening fraction comes from the physics engine's
-            actual hinge angle
+        └── Thermodynamics: envelope conduction + Gosney-Olama door infiltration
+            (tempered by vestibule & air curtain) + door-frame heater + thermostat-
+            cycled compressor (Carnot-derated COP) + twin unit-cooler fan load +
+            evaporator frosting & electric defrost + Magnus humidity balance +
+            product thermal mass — door opening fraction comes from the physics
+            engine's actual door travel
 ```
 
 ### Project layout
@@ -110,7 +118,7 @@ cold-storage-sim/
 ├── requirements.txt        # fastapi / uvicorn / mujoco / numpy
 ├── backend/
 │   ├── server.py           # FastAPI + WebSocket server, 60 Hz sim loop
-│   ├── physics.py          # MuJoCo world (door hinge / crates / grab & throw)
+│   ├── physics.py          # MuJoCo world (sliding door / crates / grab & throw)
 │   └── thermal.py          # cold-room thermodynamics (first principles)
 └── frontend/               # static, served by the backend, no build step
     ├── index.html
