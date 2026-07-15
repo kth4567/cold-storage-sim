@@ -4,94 +4,146 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css" />
   <link rel="stylesheet" href="./kp.css" />
-  <style>
-    .res-seg5 { cursor: pointer; }
-    .res-seg5 rect { transition: filter 0.12s; }
-    .res-seg5:hover rect { filter: brightness(1.45); }
-  </style>
+  <script defer src="../vendor/katex/katex.min.js"></script>
 </head>
 <body data-kp="KP05">
   <div class="kp-wrap" id="wrap">
 
-    <div class="panel viz-box">
-      <h3>温度—流程图 <small>空气沿程降温曲线 vs 制冷剂恒温平线,两线之间的带就是换热驱动力</small></h3>
-      <svg id="tzSvg" viewBox="0 0 960 400" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="hintline">💡 <b>核心体验</b>:拖动风量或蒸发温度,看温差带胀缩、LMTD 与换热量同步变;制冷剂那条"平线"是相变的视觉签名——蒸发全程温度不变。</div>
-    </div>
-
-    <div class="panel viz-box">
-      <h3>热阻串联条 <small>1/UA 拆开看:空气侧永远最宽——这就是加翅片的理由</small></h3>
-      <svg id="resSvg" viewBox="0 0 960 110" preserveAspectRatio="xMidYMid meet"></svg>
-    </div>
-
-    <div class="kp-grid main-side">
+    <!-- ═══════════ 第 1 节 ═══════════ -->
+    <section class="slide" data-title="定位与图景">
       <div class="panel">
-        <h3>运行参数</h3>
-        <div class="ctl-row">
-          <label>风量 V̇</label>
-          <input type="range" id="vol" min="2000" max="12000" step="100" value="6600" />
-          <output id="volOut"></output>
-        </div>
-        <div class="ctl-row">
-          <label>进风温度(库温)</label>
-          <input type="range" id="tin" min="-25" max="0" step="0.5" value="-16" />
-          <output id="tinOut"></output>
-        </div>
-        <div class="ctl-row">
-          <label>蒸发温度 T<sub>evap</sub></label>
-          <input type="range" id="tev" min="-35" max="-18" step="0.5" value="-26" />
-          <output id="tevOut"></output>
-        </div>
-        <div class="ctl-row">
-          <label>翅片总面积 A<sub>o</sub></label>
-          <input type="range" id="area" min="20" max="80" step="0.2" value="42.6" class="mono-track" />
-          <output id="areaOut"></output>
-        </div>
-        <div class="ctl-row">
-          <label>霜层厚度(接 KP07)</label>
-          <input type="range" id="frost" min="0" max="3" step="0.1" value="0" class="mono-track" />
-          <output id="frostOut"></output>
-        </div>
-        <div class="hintline">蒸发温差 DT = 库温 − 蒸发温度,工程上常取 6~10℃:DT 小省电但要更大面积。</div>
+        <p class="lead">蒸发器是冷库内<b>唯一主动"取走热量"的设备</b>:库内空气把从货物、围护结构、内热源吸来的热量
+          交给盘管里的低温制冷剂,制冷剂吸热<b>沸腾蒸发</b>,把热量搬出库外。它是一台典型的<b>换热器</b>——
+          一侧空气放热降温,另一侧制冷剂吸热相变。本知识点把导热、对流、相变综合起来,
+          回答"这台蒸发器能搬走多少热、需要多大面积"——冷库选型与能效评估的落脚点。</p>
+        <h3>物理图景</h3>
+        <ul class="points">
+          <li>约 −16℃ 的库内空气被风机吹过盘管,温度<b>沿流程逐渐下降</b>;盘管内约 −26℃ 的制冷剂在蒸发,
+            因为<b>相变,温度基本恒定</b>——温度-流程图上是一条平线,辨识度极高。</li>
+          <li>热量路径:空气 →(对流,含翅片)→ 管外壁 →(管壁导热)→ 管内壁 →(沸腾对流)→ 制冷剂。
+            一串<b>串联热阻</b>合成总传热系数 U。</li>
+          <li>两流体温差沿程不断变化,不能用进出口温差的算术平均,要用<b>对数平均温差 LMTD</b>。</li>
+          <li><b>翅片</b>的使命:空气侧换热系数远小于制冷剂侧,是绝对瓶颈——所以拼命扩大空气侧面积。</li>
+        </ul>
+        <div class="takeaway">一句话记忆:蒸发器 = 空气放热 + 制冷剂相变吸热的换热器,总能力用 Q = U·A·ΔT_lm 描述。</div>
       </div>
+    </section>
 
+    <!-- ═══════════ 第 2 节 ═══════════ -->
+    <section class="slide" data-title="核心公式">
       <div class="panel">
-        <h3>性能面板 <small>LMTD 法与 ε-NTU 法互相印证</small></h3>
-        <div class="cards">
-          <div class="card"><div class="lbl">端差 ΔT₁ / ΔT₂</div><div class="val" id="vDT" style="font-size:17px">--</div></div>
-          <div class="card"><div class="lbl">LMTD 对数平均温差</div><div class="val" id="vLm">--<small>℃</small></div></div>
-          <div class="card"><div class="lbl">UA 总传热能力</div><div class="val" id="vUA">--<small>W/K</small></div></div>
-          <div class="card"><div class="lbl">NTU / 效能 ε</div><div class="val" id="vNTU" style="font-size:17px">--</div></div>
-          <div class="card hot"><div class="lbl">Q (ε-NTU 法)</div><div class="val" id="vQ1">--<small>kW</small></div></div>
-          <div class="card hot"><div class="lbl">Q = UA·LMTD (互校)</div><div class="val" id="vQ2">--<small>kW</small></div></div>
-          <div class="card"><div class="lbl">出风温度</div><div class="val" id="vTout">--<small>℃</small></div></div>
-        </div>
-        <div class="formula">Q = UA · ΔT<sub>lm</sub>,ΔT<sub>lm</sub> = (ΔT₁−ΔT₂)/ln(ΔT₁/ΔT₂)</div>
-        <div class="formula cold-side">ε = 1 − e<sup>−NTU</sup>(一侧相变),Q = ε·C<sub>air</sub>·(T<sub>in</sub>−T<sub>evap</sub>)</div>
-      </div>
-    </div>
+        <h3>① 换热器基本方程</h3>
+        <div class="tex">Q = U\,A\,\Delta T_{lm}</div>
+        <p class="fnote">U:总传热系数 · A:传热面积(含翅片扩展) · ΔT_lm:对数平均温差</p>
 
-    <details class="knowledge">
-      <summary>知识速览 —— 换热器传热(蒸发器)</summary>
-      <div class="kbody">
-        <h4>物理图景</h4>
-        <p>蒸发器里两种流体隔壁换热:空气一路放热降温(指数曲线),制冷剂相变吸热、温度几乎不变(水平线)。
-          沿程温差不断缩小,所以平均温差不能用算术平均,要用<b>对数平均 LMTD</b>。</p>
-        <h4>核心公式</h4>
-        <p>Q = UA·ΔT<sub>lm</sub>;U 由"空气侧(含翅片)→ 管壁 → 霜层 → 制冷剂侧"串联热阻合成,空气侧是绝对瓶颈,
-          所以拼命加翅片扩面。已知面积求性能用 ε-NTU:NTU = UA/C<sub>min</sub>,相变侧 ε = 1−e<sup>−NTU</sup>。</p>
-        <h4>典型数值(本页默认参数即此例)</h4>
-        <p>负荷 10kW,空气 −16→−20℃,蒸发 −26℃:ΔT₁=10、ΔT₂=6,LMTD=<b>7.83℃</b>,UA=Q/LMTD≈<b>1277 W/K</b>;
-          按 U≈30 W/(m²·K) 折算需翅片面积 ≈42.6m²——这就是翅片必须存在的理由。</p>
-        <h4>常见误区</h4>
-        <p class="trap">用算术平均温差——沿程温差非线性收缩,必须 LMTD。</p>
-        <p class="trap">以为制冷剂也一路降温——相变段基本恒温,那条平线就是证据。</p>
-        <p class="trap">提高换热靠加大管内流速——瓶颈在空气侧 h<sub>o</sub>,靠翅片和风量。</p>
-        <h4>与其他知识点</h4>
-        <p>本页是汇流处:空气侧 h<sub>o</sub> 来自 KP06 风机,管壁热阻来自 KP11,霜层附加热阻来自 KP07,相变潜热让平线成立。</p>
+        <h3>② 总传热系数:串联热阻合成</h3>
+        <div class="tex">\frac{1}{UA} = \frac{1}{\eta_o h_o A_o} + \frac{\ln(r_o/r_i)}{2\pi\lambda L}
+          + \frac{1}{h_i A_i} + R_{frost}</div>
+        <p class="fnote">空气侧(h<span class="ti">_o</span>,接 KP06)→ 管壁(KP11)→ 制冷剂沸腾(h<span class="ti">_i</span> 很大)→
+          霜层(KP07)。<b>空气侧热阻最大,是控制环节</b>。</p>
+
+        <h3>③ 对数平均温差 LMTD</h3>
+        <div class="tex">\Delta T_{lm} = \frac{\Delta T_1 - \Delta T_2}{\ln(\Delta T_1/\Delta T_2)}</div>
+        <p class="fnote">ΔT₁、ΔT₂ 是换热器两端的温差。蒸发器一端 = 空气进口 − 蒸发温度,另一端 = 空气出口 − 蒸发温度。</p>
+
+        <h3>④ ε-NTU 法(已知面积求性能更方便)</h3>
+        <div class="tex">NTU = \frac{UA}{C_{min}},\qquad \varepsilon = 1 - e^{-NTU},\qquad
+          Q = \varepsilon\, C_{min}\,(T_{in} - T_{evap})</div>
+        <p class="fnote">C<span class="ti">_{min}</span> = 空气侧热容流率(相变侧视为无穷大)。LMTD 法与 ε-NTU 法结果应一致,互为印证。</p>
+
+        <h3>⑤ 工程要点</h3>
+        <ul class="points">
+          <li><b>蒸发温差 DT</b>(库温−蒸发温度)常取 6~10℃:DT 小省电(蒸发温度高、COP 好)但要更大面积——又是投资/运行的权衡。</li>
+          <li><b>翅片间距</b>要兼顾"面积大"与"少积霜好除霜"(接 KP07)。</li>
+        </ul>
       </div>
-    </details>
+    </section>
+
+    <!-- ═══════════ 第 3 节 ═══════════ -->
+    <section class="slide" data-title="互动实验">
+      <div class="panel viz-box">
+        <h3>温度—流程图:温差带就是驱动力 <small>拖动风量/蒸发温度,看温差带胀缩、LMTD 与换热量同步变</small></h3>
+        <svg id="tzSvg" viewBox="0 0 960 400" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="panel viz-box">
+        <h3>热阻串联条 <small>1/UA 拆开看——空气侧永远最宽,这就是加翅片的理由</small></h3>
+        <svg id="resSvg" viewBox="0 0 960 110" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="kp-grid main-side">
+        <div class="panel">
+          <h3>运行参数</h3>
+          <div class="ctl-row"><label>风量 V̇</label>
+            <input type="range" id="vol" min="2000" max="12000" step="100" value="6600" /><output id="volOut"></output></div>
+          <div class="ctl-row"><label>进风温度(库温)</label>
+            <input type="range" id="tin" min="-25" max="0" step="0.5" value="-16" /><output id="tinOut"></output></div>
+          <div class="ctl-row"><label>蒸发温度</label>
+            <input type="range" id="tev" min="-35" max="-18" step="0.5" value="-26" /><output id="tevOut"></output></div>
+          <div class="ctl-row"><label>翅片总面积 A_o</label>
+            <input type="range" id="area" min="20" max="80" step="0.2" value="42.6" class="mono-track" /><output id="areaOut"></output></div>
+          <div class="ctl-row"><label>霜层(接 KP07)</label>
+            <input type="range" id="frost" min="0" max="3" step="0.1" value="0" class="mono-track" /><output id="frostOut"></output></div>
+        </div>
+        <div class="panel">
+          <h3>性能面板 <small>两种算法互相印证</small></h3>
+          <div class="cards">
+            <div class="card"><div class="lbl">端差 ΔT₁ / ΔT₂</div><div class="val" id="vDT" style="font-size:19px">--</div></div>
+            <div class="card"><div class="lbl">LMTD</div><div class="val" id="vLm">--<small>℃</small></div></div>
+            <div class="card"><div class="lbl">UA</div><div class="val" id="vUA">--<small>W/K</small></div></div>
+            <div class="card"><div class="lbl">NTU / ε</div><div class="val" id="vNTU" style="font-size:19px">--</div></div>
+            <div class="card hot"><div class="lbl">Q(ε-NTU 法)</div><div class="val" id="vQ1">--<small>kW</small></div></div>
+            <div class="card hot"><div class="lbl">Q = UA·LMTD(互校)</div><div class="val" id="vQ2">--<small>kW</small></div></div>
+            <div class="card"><div class="lbl">出风温度</div><div class="val" id="vTout">--<small>℃</small></div></div>
+          </div>
+          <div class="hintline">💡 拉一点霜层滑杆,看 U 和 Q 被霜"偷走"多少(KP07 的预告)。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 第 4 节 ═══════════ -->
+    <section class="slide" data-title="典型例题">
+      <div class="panel example">
+        <h3>例题:10kW 的蒸发器需要多大的 UA?</h3>
+        <p class="lead" style="font-size:19px">蒸发器负荷 Q=10kW,库内空气从 −16℃ 降到 −20℃(进/出),
+          制冷剂蒸发温度恒为 −26℃。求 LMTD 与所需 UA。<b>(实验节默认参数即本题)</b></p>
+        <div class="step"><span class="n">1</span><div>两端温差:
+          <div class="tex">\Delta T_1 = -16-(-26) = 10\;{}^\circ\mathrm{C}\;(进口端),\qquad
+            \Delta T_2 = -20-(-26) = 6\;{}^\circ\mathrm{C}\;(出口端)</div></div></div>
+        <div class="step"><span class="n">2</span><div>对数平均温差:
+          <div class="tex">\Delta T_{lm} = \frac{10-6}{\ln(10/6)} = \frac{4}{0.511} \approx 7.83\;{}^\circ\mathrm{C}</div></div></div>
+        <div class="step"><span class="n">3</span><div>所需总传热能力:
+          <div class="tex">UA = \frac{Q}{\Delta T_{lm}} = \frac{10000}{7.83} \approx 1277\;\mathrm{W/K}</div></div></div>
+        <div class="step"><span class="n">4</span><div>估算所需面积(取综合 U≈30 W/(m²·K)):
+          <div class="tex">A = \frac{1277}{30} \approx 42.6\;\mathrm{m^2}</div></div></div>
+        <div class="answer">✅ LMTD≈7.83℃,UA≈1277 W/K,需翅片面积约 42.6m²——一根光管远远不够,
+          这就是翅片必须存在的理由。</div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 第 5 节 ═══════════ -->
+    <section class="slide" data-title="误区与小结">
+      <div class="panel">
+        <h3>常见误区</h3>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">用算术平均温差?</span> →
+          <span class="right">✔</span> 温差沿程非线性收缩,必须用 <b>LMTD</b>。</div></div>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">制冷剂也一路降温?</span> →
+          <span class="right">✔</span> 相变段温度<b>基本恒定</b>——那条平线就是证据。</div></div>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">提高换热靠加大管内流速?</span> →
+          <span class="right">✔</span> 瓶颈在<b>空气侧 h_o</b>,靠翅片和风量。</div></div>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">霜层无所谓?</span> →
+          <span class="right">✔</span> 霜层显著抬高热阻、拉低 U(KP07)。</div></div>
+        <h3 style="margin-top:20px">与其他知识点的联系</h3>
+        <p>本页是多个知识点的<b>汇流处</b>:空气侧 h<span class="ti">_o</span> 来自 KP06 风机强制对流;管壁热阻来自 KP11 圆筒壁;
+          霜层附加热阻来自 KP07;制冷剂蒸发潜热让"平线"成立。蒸发器换热好 → 蒸发温度可提高 → 压缩机 COP 更好,系统更省电。</p>
+        <div class="link-row">
+          <a href="./kp06.html">KP06 强制对流</a><a href="./kp07.html">KP07 霜层热阻</a>
+          <a href="./kp11.html">KP11 圆筒壁导热</a>
+        </div>
+        <div class="takeaway">要点小结:Q = UA·ΔT_lm;U 由串联热阻合成、空气侧是瓶颈(翅片扩面);
+          已知面积求性能用 ε-NTU(相变侧 ε=1−e^(−NTU));设计要权衡蒸发温差 DT 并给霜层留余量。</div>
+      </div>
+    </section>
   </div>
 
   <script type="module">
@@ -99,11 +151,11 @@
     initPage();
 
     const state = { vol: 6600, Tin: -16, Tev: -26, Ao: 42.6, frost: 0 };
-    const RHO = 1.35, CP = 1006;            // −18℃ 空气
-    const HO_REF = 42, VOL_REF = 6600;      // 风量→空气侧折算换热系数 (含翅片效率)
-    const R_WALL = 2e-5;                    // 管壁 (K/W)
-    const HI = 2000, AI = 2.5;              // 制冷剂侧
-    const LAM_F = 0.1;                      // 霜导热系数 W/mK
+    const RHO = 1.35, CP = 1006;
+    const HO_REF = 42, VOL_REF = 6600;
+    const R_WALL = 2e-5;
+    const HI = 2000, AI = 2.5;
+    const LAM_F = 0.1;
 
     function compute() {
       const mdot = state.vol * RHO / 3600;
@@ -127,56 +179,47 @@
     const tz = $("#tzSvg");
     function drawTZ(r) {
       tz.innerHTML = "";
-      const X = scale([0, 1], [90, 900]);
+      const X = scale([0, 1], [95, 900]);
       const tLo = state.Tev - 3, tHi = Math.max(state.Tin + 3, state.Tev + 8);
-      const Y = scale([tLo, tHi], [340, 40]);
-      // 轴
-      svgEl("line", { x1: 90, y1: 340, x2: 900, y2: 340, stroke: "#39516d" }, tz);
-      svgEl("line", { x1: 90, y1: 340, x2: 90, y2: 34, stroke: "#39516d" }, tz);
-      svgEl("text", { x: 880, y: 362, class: "svg-note", text: "沿盘管流程 z →" }, tz);
-      svgEl("text", { x: 94, y: 28, class: "svg-note", text: "温度 ℃" }, tz);
+      const Y = scale([tLo, tHi], [340, 44]);
+      svgEl("line", { x1: 95, y1: 340, x2: 900, y2: 340, stroke: "#8aa0b8", "stroke-width": 1.5 }, tz);
+      svgEl("line", { x1: 95, y1: 340, x2: 95, y2: 38, stroke: "#8aa0b8", "stroke-width": 1.5 }, tz);
+      svgEl("text", { x: 875, y: 364, class: "svg-note", "font-size": "15", text: "沿盘管流程 z →" }, tz);
+      svgEl("text", { x: 100, y: 30, class: "svg-note", "font-size": "15", text: "温度 ℃" }, tz);
       for (let t = Math.ceil(tLo / 2) * 2; t <= tHi; t += 2) {
-        svgEl("text", { x: 82, y: Y(t) + 4, "text-anchor": "end", class: "svg-note", text: t }, tz);
-        svgEl("line", { x1: 88, y1: Y(t), x2: 900, y2: Y(t), stroke: "rgba(90,130,180,0.1)" }, tz);
+        svgEl("text", { x: 86, y: Y(t) + 5, "text-anchor": "end", class: "svg-note", text: t }, tz);
+        svgEl("line", { x1: 93, y1: Y(t), x2: 900, y2: Y(t), stroke: "rgba(70,110,160,0.12)" }, tz);
       }
-      // 空气曲线点集
       const airPts = [];
       for (let z = 0; z <= 1.0001; z += 0.02) {
         airPts.push([X(z), Y(state.Tev + (state.Tin - state.Tev) * Math.exp(-r.NTU * z))]);
       }
-      // 温差带 (空气曲线与蒸发平线之间)
-      const band = airPts.map((p) => p.join(",")).join(" ") +
-        ` ${X(1)},${Y(state.Tev)} ${X(0)},${Y(state.Tev)}`;
-      svgEl("polygon", { points: band, fill: "rgba(255,150,80,0.16)", stroke: "none" }, tz);
-      // 制冷剂平线
-      svgEl("line", { x1: X(0), y1: Y(state.Tev), x2: X(1), y2: Y(state.Tev),
-        stroke: "#53c1ff", "stroke-width": 3 }, tz);
-      svgEl("text", { x: X(0.42), y: Y(state.Tev) + 20, class: "svg-note", fill: "#9fd4ff",
-        text: `制冷剂蒸发 ${state.Tev}℃ —— 相变恒温平线 (潜热吸热)` }, tz);
-      // 空气曲线
+      const band = airPts.map((p) => p.join(",")).join(" ") + ` ${X(1)},${Y(state.Tev)} ${X(0)},${Y(state.Tev)}`;
+      svgEl("polygon", { points: band, fill: "rgba(217,79,22,0.13)" }, tz);
+      svgEl("line", { x1: X(0), y1: Y(state.Tev), x2: X(1), y2: Y(state.Tev), stroke: "#1f7fd4", "stroke-width": 3.5 }, tz);
+      svgEl("text", { x: X(0.42), y: Y(state.Tev) + 24, class: "svg-note", fill: "#0d4f8f", "font-size": "15",
+        "font-weight": "700", text: `制冷剂蒸发 ${state.Tev}℃ —— 相变恒温平线(潜热吸热)` }, tz);
       svgEl("polyline", { points: airPts.map((p) => p.join(",")).join(" "), fill: "none",
-        stroke: "#ff9a5c", "stroke-width": 3, filter: "drop-shadow(0 0 5px rgba(255,150,80,0.5))" }, tz);
-      svgEl("text", { x: X(0.16), y: Y(state.Tev + (state.Tin - state.Tev) * Math.exp(-r.NTU * 0.16)) - 12,
-        class: "svg-note", fill: "#ffcf9e", text: `空气 ${state.Tin}℃ → ${fmt(r.Tout, 1)}℃ (放热降温)` }, tz);
-      // 端差标注
+        stroke: "#d94f16", "stroke-width": 3.5 }, tz);
+      svgEl("text", { x: X(0.13), y: Y(state.Tev + (state.Tin - state.Tev) * Math.exp(-r.NTU * 0.13)) - 14,
+        class: "svg-note", fill: "#a34410", "font-size": "15", "font-weight": "700",
+        text: `空气 ${state.Tin}℃ → ${fmt(r.Tout, 1)}℃(放热降温)` }, tz);
       const mark = (z, dT, name) => {
         const xx = X(z);
         svgEl("line", { x1: xx, y1: Y(state.Tev), x2: xx, y2: Y(state.Tev + dT),
-          stroke: "#ffe6cd", "stroke-width": 1.6, "marker-end": "", "stroke-dasharray": "3 3" }, tz);
-        svgEl("text", { x: xx + (z < 0.5 ? 7 : -7), y: Y(state.Tev + dT / 2) + 4,
-          "text-anchor": z < 0.5 ? "start" : "end", class: "svg-note", fill: "#ffe6cd",
-          text: `${name}=${fmt(dT, 1)}℃` }, tz);
+          stroke: "#7d5a3c", "stroke-width": 2, "stroke-dasharray": "4 3" }, tz);
+        svgEl("text", { x: xx + (z < 0.5 ? 8 : -8), y: Y(state.Tev + dT / 2) + 5,
+          "text-anchor": z < 0.5 ? "start" : "end", class: "svg-note", fill: "#7d5a3c",
+          "font-weight": "700", text: `${name}=${fmt(dT, 1)}℃` }, tz);
       };
       mark(0.015, r.dT1, "ΔT₁");
       mark(0.985, r.dT2, "ΔT₂");
-      // LMTD 虚线
       svgEl("line", { x1: X(0), y1: Y(state.Tev + r.lmtd), x2: X(1), y2: Y(state.Tev + r.lmtd),
-        stroke: "rgba(255,220,170,0.7)", "stroke-dasharray": "7 5" }, tz);
-      svgEl("text", { x: X(0.6), y: Y(state.Tev + r.lmtd) - 7, class: "svg-note", fill: "#ffdfb8",
-        text: `LMTD = ${fmt(r.lmtd, 2)}℃ (温差带的"对数平均高度")` }, tz);
-      // 流向箭头
-      svgEl("text", { x: X(0.02), y: 372, class: "svg-note", fill: "#8fa9c7", text: "空气进 ▶" }, tz);
-      svgEl("text", { x: X(0.93), y: 372, class: "svg-note", fill: "#8fa9c7", text: "▶ 空气出" }, tz);
+        stroke: "#b98a2a", "stroke-width": 2, "stroke-dasharray": "8 5" }, tz);
+      svgEl("text", { x: X(0.58), y: Y(state.Tev + r.lmtd) - 8, class: "svg-note", fill: "#8a6410",
+        "font-size": "15", "font-weight": "700", text: `LMTD = ${fmt(r.lmtd, 2)}℃(温差带的"对数平均高度")` }, tz);
+      svgEl("text", { x: X(0.02), y: 372, class: "svg-note", text: "空气进 ▶" }, tz);
+      svgEl("text", { x: X(0.92), y: 372, class: "svg-note", text: "▶ 空气出" }, tz);
     }
 
     // ---------------- 热阻串联条 ----------------
@@ -184,33 +227,30 @@
     function drawRes(r) {
       resSvg.innerHTML = "";
       const items = [
-        { name: "空气侧+翅片 1/(ηh·A)", R: r.Rair, c: "#ff9a5c" },
-        { name: "管壁", R: R_WALL, c: "#aeb9c4" },
-        ...(r.Rfrost > 0 ? [{ name: `霜层 ${state.frost}mm`, R: r.Rfrost, c: "#bfe6ff" }] : []),
-        { name: "制冷剂侧 1/(h·A)", R: r.Rref, c: "#53c1ff" },
+        { name: "空气侧+翅片 1/(ηh·A)", R: r.Rair, c: "#f0a273" },
+        { name: "管壁", R: R_WALL, c: "#c3ccd4" },
+        ...(r.Rfrost > 0 ? [{ name: `霜层 ${state.frost}mm`, R: r.Rfrost, c: "#a8d4f0" }] : []),
+        { name: "制冷剂侧 1/(h·A)", R: r.Rref, c: "#6aa5d8" },
       ];
       const Rtot = items.reduce((s, it) => s + it.R, 0);
-      const MINW = 56, avail = 820;
+      const MINW = 62, avail = 810;
       let flexR = 0, fixedW = 0;
       const raw = items.map((it) => (it.R / Rtot) * avail);
       items.forEach((it, i) => { if (raw[i] < MINW) fixedW += MINW; else flexR += it.R; });
       const kk = (avail - fixedW) / flexR;
-      let x = 70;
+      let x = 75;
       items.forEach((it, i) => {
         const w = raw[i] < MINW ? MINW : it.R * kk;
-        const g = svgEl("g", { class: "res-seg5" }, resSvg);
-        svgEl("rect", { x, y: 26, width: w - 3, height: 30, rx: 6, fill: it.c, opacity: 0.85 }, g);
+        svgEl("rect", { x, y: 24, width: w - 3, height: 32, rx: 7, fill: it.c, stroke: "#8898a8" }, resSvg);
         svgEl("text", { x: x + w / 2, y: 45, "text-anchor": "middle", class: "svg-note",
-          fill: "#0d141f", "font-weight": "700",
-          text: `${(it.R / Rtot * 100).toFixed(0)}%` }, g);
-        svgEl("text", { x: x + w / 2, y: 76, "text-anchor": "middle", class: "svg-note", text: it.name }, g);
+          fill: "#243748", "font-weight": "700", text: `${(it.R / Rtot * 100).toFixed(0)}%` }, resSvg);
+        svgEl("text", { x: x + w / 2, y: 78, "text-anchor": "middle", class: "svg-note", text: it.name }, resSvg);
         x += w;
       });
-      svgEl("text", { x: 480, y: 100, "text-anchor": "middle", class: "svg-note",
-        text: `1/UA = ΣR = ${(Rtot * 1000).toFixed(3)}×10⁻³ K/W → UA = ${fmt(1 / Rtot, 0)} W/K ${r.Rfrost > 0 ? " —— 霜层正在偷走换热能力!" : ""}` }, resSvg);
+      svgEl("text", { x: 480, y: 102, "text-anchor": "middle", class: "svg-note", "font-size": "15",
+        text: `1/UA = ΣR = ${(Rtot * 1000).toFixed(3)}×10⁻³ K/W → UA = ${fmt(1 / Rtot, 0)} W/K${r.Rfrost > 0 ? " —— 霜层正在偷走换热能力!" : ""}` }, resSvg);
     }
 
-    // ---------------- 面板 ----------------
     function renderMetrics(r) {
       $("#vDT").textContent = `${fmt(r.dT1, 1)} / ${fmt(r.dT2, 1)} ℃`;
       $("#vLm").innerHTML = `${fmt(r.lmtd, 2)}<small>℃</small>`;

@@ -79,7 +79,7 @@ curl http://127.0.0.1:8017/api/state    # should return a JSON snapshot
 | R | Reset the whole scene (rigid bodies + thermodynamics) |
 | T | Manual defrost |
 | 1 / 2 / 3 | Thermodynamics time scale 1× / 30× / 120× |
-| Q | Inspect the heat-transfer knowledge point of whatever the crosshair targets (popup → interactive lesson page) |
+| Left click (aim at a ❄ knowledge cloud) | Floating clouds mark each heat-transfer hotspot; aim to get a confirm button, click to open the lesson popup |
 | Esc | Release the mouse (to use the control panel buttons) |
 
 **Suggested tour:** press `2` (30× time), slide the door open with `E`, and watch the
@@ -95,13 +95,14 @@ to close the door on it.
 
 ## Interactive Heat-Transfer Lessons
 
-Every part of the cold room doubles as a heat-transfer lesson. Aim at a **wall / roof /
-floor / door / unit cooler / fan / ceiling pipe / cargo box** and press `Q` to open a
-popup with the matching knowledge point, then jump into its dedicated interactive page.
-The full atlas of 11 lessons lives at `/kp/` — each page has a unique interaction
-metaphor (draggable insulation layer, sun-path slider, frost/defrost sawtooth, Bi
-seesaw, surface-vs-center cooling race, critical insulation radius, ...) and runs its
-physics entirely in the browser, matching the worked examples in `docs/kp/`.
+Every part of the cold room doubles as a heat-transfer lesson. Visible **❄ knowledge
+clouds** float at each hotspot (walls, roof, floor, door, unit coolers, fans, ceiling
+pipes, cargo racks); aim at one and a confirm button appears — click to open the lesson
+popup and jump into the dedicated page. Lesson pages are designed for **classroom
+projection**: white background, large type, KaTeX-typeset formulas, and a five-part
+slide flow (physics picture → key equations → interactive experiment → worked example
+→ pitfalls), with arrow-key paging. The full atlas of 11 lessons lives at `/kp/`; all
+physics runs in the browser and matches the worked examples in `docs/kp/`.
 
 ---
 

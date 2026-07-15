@@ -366,112 +366,151 @@ canvas.webgl {
 
 #connDot.ok i { background: #31d05a; box-shadow: 0 0 10px #31d05a; }
 
-/* ------------------------------------------------ 传热知识点浮窗 */
+/* ------------------------------------------------ 知识云确认按钮 */
+#kpPrompt {
+  position: fixed;
+  left: 50%;
+  top: calc(50% + 78px);
+  z-index: 7;
+  transform: translateX(-50%);
+  padding: 12px 26px;
+  border: 2px solid #6fb3ec;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #17293d;
+  font-size: 16px;
+  text-align: center;
+  display: none;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  animation: promptPop 0.18s ease;
+}
+
+#kpPrompt.active { display: block; }
+#kpPrompt b { color: #1668b8; }
+
+#kpPrompt span {
+  display: block;
+  margin-top: 3px;
+  font-size: 13.5px;
+  color: #d94f16;
+  font-weight: 700;
+}
+
+@keyframes promptPop {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to { opacity: 1; transform: translateX(-50%); }
+}
+
+/* ------------------------------------------------ 传热知识点浮窗 (课堂白底) */
 #kpModal {
   position: fixed;
   inset: 0;
   z-index: 12;
   display: none;
   place-items: center;
-  background: rgba(4, 8, 14, 0.68);
-  backdrop-filter: blur(6px);
+  background: rgba(10, 18, 28, 0.55);
+  backdrop-filter: blur(5px);
 }
 
 #kpModal.active { display: grid; }
 
 .kp-modal-card {
-  width: min(560px, 92vw);
+  width: min(620px, 92vw);
   max-height: 84vh;
   overflow-y: auto;
-  border: 1px solid rgba(150, 200, 255, 0.3);
-  border-radius: 12px;
-  background: rgba(9, 15, 25, 0.94);
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
-  padding: 16px 20px 20px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45);
+  padding: 18px 24px 22px;
+  color: #17293d;
 }
 
 .kp-modal-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
   margin-bottom: 14px;
-  border-bottom: 1px solid rgba(210, 230, 255, 0.16);
+  border-bottom: 2px solid #e3ebf3;
 }
 
-.kp-modal-head h2 { margin: 0; font-size: 17px; flex: 1; }
+.kp-modal-head h2 { margin: 0; font-size: 20px; flex: 1; color: #17293d; }
 
 .kp-modal-hub {
-  font-size: 12px;
-  color: #8fc2f5;
+  font-size: 14.5px;
+  color: #1668b8;
+  font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
 }
 
-.kp-modal-hub:hover { color: #c4e2ff; }
+.kp-modal-hub:hover { text-decoration: underline; }
 
 #kpModalClose {
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgba(160, 200, 255, 0.3);
-  border-radius: 7px;
-  background: rgba(28, 48, 76, 0.6);
-  color: #dbeaff;
-  font-size: 17px;
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid #c4d2e0;
+  border-radius: 9px;
+  background: #f2f6fa;
+  color: #17293d;
+  font-size: 19px;
   line-height: 1;
   cursor: pointer;
 }
 
-#kpModalClose:hover { background: rgba(50, 84, 128, 0.8); }
+#kpModalClose:hover { background: #e3ecf4; }
 
 .kp-pop-card {
-  border: 1px solid rgba(140, 190, 255, 0.18);
-  border-radius: 10px;
-  background: rgba(14, 24, 40, 0.75);
-  padding: 13px 16px;
+  border: 1.5px solid #dde6ee;
+  border-radius: 12px;
+  background: #fafcfe;
+  padding: 15px 18px;
   margin-bottom: 12px;
 }
 
-.kp-pop-head { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.kp-pop-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 
 .kp-pop-id {
   font-family: Consolas, monospace;
-  font-size: 12px;
-  color: #6fb3ec;
+  font-size: 14px;
+  color: #1668b8;
+  font-weight: 700;
   letter-spacing: 1px;
 }
 
-.kp-pop-title { font-size: 15.5px; font-weight: 700; }
+.kp-pop-title { font-size: 19px; font-weight: 700; color: #17293d; }
 
 .kp-pop-cat {
-  font-size: 11px;
-  padding: 1px 9px;
+  font-size: 13px;
+  padding: 1px 11px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 150, 80, 0.4);
-  color: #ffce9f;
+  border: 1px solid #ecb28e;
+  color: #a34a15;
+  background: #fdeee4;
 }
 
 .kp-pop-formula {
   font-family: Consolas, monospace;
-  font-size: 12.5px;
-  color: #ffd9b3;
-  margin: 7px 0 2px;
+  font-size: 14.5px;
+  color: #a34410;
+  margin: 8px 0 2px;
 }
 
-.kp-pop-brief { margin: 6px 0 10px; font-size: 12.8px; color: #c2d5ea; line-height: 1.65; }
+.kp-pop-brief { margin: 6px 0 12px; font-size: 15.5px; color: #52667c; line-height: 1.7; }
 
 .kp-pop-go {
   display: inline-block;
-  padding: 6px 15px;
-  border: 1px solid rgba(114, 181, 255, 0.55);
-  border-radius: 7px;
-  background: rgba(22, 62, 110, 0.75);
-  color: #eaf5ff;
-  font-size: 12.5px;
+  padding: 9px 22px;
+  border-radius: 9px;
+  background: #1668b8;
+  color: #ffffff;
+  font-size: 15.5px;
+  font-weight: 600;
   text-decoration: none;
 }
 
-.kp-pop-go:hover { background: rgba(35, 88, 150, 0.9); }
+.kp-pop-go:hover { background: #12579b; }
 
 @media (max-width: 900px) {
   #environment, #chartBox { display: none; }

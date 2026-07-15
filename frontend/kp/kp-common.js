@@ -1,5 +1,12 @@
-// 知识点页面公共层:页面骨架注入 + 数学/绘图小工具。
-// 各 KP 页面只写自己的交互主体,页眉、页脚导航、标题由 initPage() 统一生成。
+// 知识点页面公共层:课堂分节翻页骨架 + KaTeX 渲染 + 数学/绘图小工具。
+// 页面结构约定:
+//   <body data-kp="KP01"><div class="kp-wrap" id="wrap">
+//     <section class="slide" data-title="定位与图景">…</section>
+//     <section class="slide" data-title="核心公式">…</section>
+//     …
+//   </div></body>
+// 公式写法: <div class="tex">q = \lambda \frac{\Delta T}{\delta}</div> (展示级)
+//           <span class="ti">\mathrm{Bi}</span> (行内)
 
 import { KP_META, KP_BY_ID } from "./kp-meta.js";
 
@@ -9,7 +16,6 @@ export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-/** 创建 SVG 元素: svgEl("rect", { x: 0, width: 10, fill: "#fff" }, parent) */
 export function svgEl(tag, attrs = {}, parent = null) {
   const el = document.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -23,11 +29,8 @@ export function svgEl(tag, attrs = {}, parent = null) {
 // ---------------------------------------------------------------- 数值
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 export const lerp = (a, b, t) => a + (b - a) * t;
-
-/** 数字格式化: 自动千分位不需要, 固定小数位, NaN 显示 -- */
 export const fmt = (v, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : "--");
 
-/** 线性比例尺: const x = scale([0, 10], [40, 400]); x(5) → 220 */
 export function scale([d0, d1], [r0, r1]) {
   const k = (r1 - r0) / (d1 - d0 || 1e-12);
   return (v) => r0 + (v - d0) * k;
@@ -44,7 +47,6 @@ export function erf(x) {
 
 export const erfc = (x) => 1 - erf(x);
 
-/** 二分法求根: f 在 [a,b] 上变号 */
 export function solveBisect(f, a, b, iters = 60) {
   let fa = f(a);
   for (let i = 0; i < iters; i++) {
@@ -56,17 +58,15 @@ export function solveBisect(f, a, b, iters = 60) {
   return (a + b) / 2;
 }
 
-// ---------------------------------------------------------------- 温度色标
-// 全站统一: 热橙 ↔ 冰青, 中点为中性灰蓝。
+// ---------------------------------------------------------------- 温度色标 (白底友好)
 const RAMP = [
-  { t: 0.0, c: [37, 118, 220] },   // 深冷蓝
-  { t: 0.35, c: [92, 190, 255] },  // 冰青
-  { t: 0.5, c: [188, 202, 216] },  // 中性
-  { t: 0.68, c: [255, 172, 96] },  // 暖橙
-  { t: 1.0, c: [235, 78, 34] },    // 热红
+  { t: 0.0, c: [21, 101, 192] },   // 深冷蓝
+  { t: 0.35, c: [100, 181, 246] }, // 冰青
+  { t: 0.5, c: [222, 226, 230] },  // 中性浅灰
+  { t: 0.68, c: [255, 167, 89] },  // 暖橙
+  { t: 1.0, c: [217, 72, 15] },    // 热红
 ];
 
-/** 温度 → 颜色。tempColor(-18, -30, 40) → "rgb(...)" (冷=蓝, 热=红) */
 export function tempColor(t, tMin, tMax) {
   const u = clamp((t - tMin) / (tMax - tMin || 1e-9), 0, 1);
   for (let i = 1; i < RAMP.length; i++) {
@@ -76,15 +76,10 @@ export function tempColor(t, tMin, tMax) {
       return `rgb(${c[0]},${c[1]},${c[2]})`;
     }
   }
-  return "rgb(235,78,34)";
+  return "rgb(217,72,15)";
 }
 
 // ---------------------------------------------------------------- 控件绑定
-/**
- * 绑定滑杆与输出显示。
- * bindSlider("#dIns", "#dInsOut", (v) => `${v} mm`, onChange)
- * onChange 收到 Number 值; 返回 input 元素。
- */
 export function bindSlider(inputSel, outputSel, format, onChange) {
   const input = typeof inputSel === "string" ? $(inputSel) : inputSel;
   const out = typeof outputSel === "string" ? $(outputSel) : outputSel;
@@ -98,11 +93,25 @@ export function bindSlider(inputSel, outputSel, format, onChange) {
   return input;
 }
 
+// ---------------------------------------------------------------- KaTeX
+/** 渲染页面里所有 .tex(展示级) 与 .ti(行内) 元素 */
+export function renderTeX(root = document) {
+  if (typeof katex === "undefined") return;
+  $$(".tex", root).forEach((el) => {
+    if (el.dataset.done) return;
+    const src = el.textContent;
+    el.dataset.done = "1";
+    katex.render(src, el, { displayMode: true, throwOnError: false });
+  });
+  $$(".ti", root).forEach((el) => {
+    if (el.dataset.done) return;
+    const src = el.textContent;
+    el.dataset.done = "1";
+    katex.render(src, el, { displayMode: false, throwOnError: false });
+  });
+}
+
 // ---------------------------------------------------------------- 页面骨架
-/**
- * 注入页眉 + 页脚导航。页面需:
- *   <body data-kp="KP01"><div class="kp-wrap" id="wrap"> …页面主体… </div></body>
- */
 export function initPage() {
   const id = document.body.dataset.kp;
   const meta = KP_BY_ID[id];
@@ -110,22 +119,62 @@ export function initPage() {
   document.title = `${meta.id} ${meta.title} · 数字冷库传热学`;
 
   const wrap = $("#wrap") || $(".kp-wrap");
+
+  // 页眉
   const header = document.createElement("header");
   header.className = "kp-header";
   header.innerHTML = `
     <div class="kp-num">${meta.num}</div>
     <div class="kp-head-main">
-      <div class="kp-kicker">COLD STORAGE · HEAT TRANSFER / ${meta.id}</div>
       <h1 class="kp-title">${meta.title}</h1>
       <div class="kp-badges">
-        <span class="badge">📍 ${meta.part}</span>
+        <span class="badge">📍 冷库部位:${meta.part}</span>
         <span class="badge cat">${meta.cat}</span>
-        <span class="badge" style="font-family:var(--mono)">${meta.formula}</span>
       </div>
     </div>
     <a class="kp-back" href="./index.html">↩ 知识点总览</a>`;
   wrap.prepend(header);
 
+  // 分节翻页
+  const slides = $$("section.slide", wrap);
+  let cur = 0;
+  const tabs = document.createElement("nav");
+  tabs.className = "slide-tabs";
+  slides.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.innerHTML = `<span class="no">第 ${i + 1} 节</span>${s.dataset.title}`;
+    b.addEventListener("click", () => show(i));
+    tabs.appendChild(b);
+  });
+  header.after(tabs);
+
+  const foot = document.createElement("div");
+  foot.className = "slide-foot";
+  foot.innerHTML = `
+    <button id="slidePrev">← 上一节</button>
+    <span class="pager" id="slidePager"></span>
+    <button id="slideNext">下一节 →</button>
+    <span class="keys-hint">键盘 ← → 也可翻页</span>`;
+  wrap.appendChild(foot);
+
+  function show(i) {
+    cur = clamp(i, 0, slides.length - 1);
+    slides.forEach((s, j) => s.classList.toggle("on", j === cur));
+    $$("button", tabs).forEach((b, j) => b.classList.toggle("on", j === cur));
+    $("#slidePager").textContent = `${cur + 1} / ${slides.length}`;
+    $("#slidePrev").disabled = cur === 0;
+    $("#slideNext").disabled = cur === slides.length - 1;
+    scrollTo({ top: 0, behavior: "instant" });
+  }
+  $("#slidePrev").addEventListener("click", () => show(cur - 1));
+  $("#slideNext").addEventListener("click", () => show(cur + 1));
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (e.key === "ArrowLeft") show(cur - 1);
+    if (e.key === "ArrowRight") show(cur + 1);
+  });
+
+  // 页脚 KP 间导航
   const idx = KP_META.findIndex((k) => k.id === id);
   const prev = KP_META[(idx + KP_META.length - 1) % KP_META.length];
   const next = KP_META[(idx + 1) % KP_META.length];
@@ -135,5 +184,8 @@ export function initPage() {
     <a href="./${prev.file}"><div class="dir">← PREV</div><div class="name">${prev.id} ${prev.title}</div></a>
     <a href="./${next.file}" class="next"><div class="dir">NEXT →</div><div class="name">${next.id} ${next.title}</div></a>`;
   wrap.appendChild(nav);
+
+  show(0);
+  renderTeX();
   return meta;
 }

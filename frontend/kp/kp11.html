@@ -4,109 +4,168 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css" />
   <link rel="stylesheet" href="./kp.css" />
+  <script defer src="../vendor/katex/katex.min.js"></script>
   <style>
     .ring-handle { cursor: ew-resize; }
-    .view-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .view-tabs { display: flex; gap: 10px; margin-bottom: 12px; }
   </style>
 </head>
 <body data-kp="KP11">
   <div class="kp-wrap" id="wrap">
 
-    <div class="panel viz-box">
-      <div class="view-tabs">
-        <button class="kbtn on" data-view="cross">⊙ 管道横截面</button>
-        <button class="kbtn" data-view="wall">⊥ 穿墙纵剖(冷桥)</button>
-      </div>
-      <div id="crossView" class="kp-grid cols-2">
-        <div>
-          <h3>同心圆环剖面 <small>拖动最外圈边缘改保温厚度(√r 缩放显示)</small></h3>
-          <svg id="ringSvg" viewBox="0 0 460 420" preserveAspectRatio="xMidYMid meet"></svg>
-        </div>
-        <div>
-          <h3>沿半径温度分布 <small>对流是"台阶",圆筒导热是"弯曲的对数线"</small></h3>
-          <svg id="radialSvg" viewBox="0 0 460 420" preserveAspectRatio="xMidYMid meet"></svg>
-        </div>
-      </div>
-      <div id="wallView" style="display:none">
-        <h3>穿墙节点 <small>保温断没断,一眼看出来</small></h3>
-        <svg id="bridgeSvg" viewBox="0 0 960 340" preserveAspectRatio="xMidYMid meet"></svg>
-        <div class="ctl-row">
-          <label>穿墙保温</label>
-          <button class="kbtn on" id="contBtn">连续包裹</button>
-          <button class="kbtn" id="brkBtn">断桥(裸管穿墙)</button>
-        </div>
-      </div>
-      <div class="hintline">💡 <b>核心体验</b>:把保温拖厚,温度曲线的"弯"越弯、冷损失越小;但把 h<sub>o</sub> 调小/λ<sub>ins</sub> 调大,临界半径 r<sub>cr</sub>=λ/h 可能跑到管径外——那时薄保温反而"越包越漏"。</div>
-    </div>
-
-    <div class="panel viz-box">
-      <h3>四段热阻串联条 <small>单位管长 K·m/W —— 保温是绝对主力</small></h3>
-      <svg id="resSvg" viewBox="0 0 960 105" preserveAspectRatio="xMidYMid meet"></svg>
-    </div>
-
-    <div class="kp-grid main-side">
-      <div class="panel viz-box">
-        <h3>临界半径寻优 <small>总冷损失 q<sub>l</sub> vs 保温外径 r₃</small></h3>
-        <svg id="critSvg" viewBox="0 0 680 330" preserveAspectRatio="xMidYMid meet"></svg>
-      </div>
-
+    <!-- ═══════════ 第 1 节 ═══════════ -->
+    <section class="slide" data-title="定位与图景">
       <div class="panel">
-        <h3>参数与读数 <small>制冷剂 −30℃ · 库外 +5℃</small></h3>
-        <div class="ctl-row">
-          <label>保温外径 r₃</label>
-          <input type="range" id="r3" min="11" max="60" step="0.5" value="40" />
-          <output id="r3Out"></output>
-        </div>
-        <div class="ctl-row">
-          <label>保温 λ<sub>ins</sub></label>
-          <input type="range" id="lins" min="0.02" max="0.2" step="0.005" value="0.04" class="mono-track" />
-          <output id="linsOut"></output>
-        </div>
-        <div class="ctl-row">
-          <label>管内流速(→h<sub>i</sub>)</label>
-          <input type="range" id="u" min="0.2" max="3" step="0.05" value="1" class="mono-track" />
-          <output id="uOut"></output>
-        </div>
-        <div class="ctl-row">
-          <label>外表面 h<sub>o</sub></label>
-          <input type="range" id="ho" min="3" max="30" step="0.5" value="8" />
-          <output id="hoOut"></output>
-        </div>
-        <div class="cards" style="margin-top:10px">
-          <div class="card hot"><div class="lbl">单位管长冷损失 q<sub>l</sub></div><div class="val" id="vQl">--<small>W/m</small></div></div>
-          <div class="card"><div class="lbl">总热阻 ΣR</div><div class="val" id="vRt">--<small>K·m/W</small></div></div>
-          <div class="card"><div class="lbl">临界半径 r<sub>cr</sub>=λ/h<sub>o</sub></div><div class="val" id="vRcr">--<small>mm</small></div></div>
-          <div class="card"><div class="lbl">保温热阻占比</div><div class="val" id="vShare">--<small>%</small></div></div>
-          <div class="card" id="verdictCard"><div class="lbl">保温有效性判定</div>
-            <div class="val" style="font-size:13.5px" id="vVerdict">--</div></div>
-        </div>
-        <div class="formula cold-side">R<sub>圆筒</sub> = ln(r₂/r₁)/(2πλL) —— 平壁 δ/λ 的"曲面版"</div>
-        <div class="formula">h<sub>i</sub> 由 Dittus-Boelter Nu=0.023Re⁰·⁸Pr<sup>n</sup> 而来(KP06 的管内版)</div>
+        <p class="lead">墙体(KP01)是<b>平壁</b>,但冷库里大量换热发生在<b>圆管</b>里:蒸发器盘管、供液/回气管、穿墙管路。
+          圆管几何决定了导热要用<b>圆筒坐标</b>,且传热面积<b>沿半径变化</b>——带来平壁没有的新现象(临界保温半径)。
+          本知识点是全套的<b>集大成者</b>:管内强制对流(KP06 圆管版)+ 圆筒壁径向导热(KP01 曲面版)+
+          串联热阻(KP05 思路),最后落到冷库最痛的工程点——<b>穿墙冷桥</b>。</p>
+        <h3>物理图景:低头看一根管子的横截面</h3>
+        <ul class="points">
+          <li>制冷剂在圆心<b>强制流动</b>,与管内壁对流换热(第一段热阻);</li>
+          <li>热量<b>沿半径</b>穿过金属管壁(第二段)、再穿过外包保温层(第三段,主阻);</li>
+          <li>最后从保温外表面对流散给周围空气(第四段)——四段<b>串联</b>,热流一路"闯关"。</li>
+          <li>与平壁的根本不同:<b>面积随半径增大</b>,外层单位厚度的阻力没有内层大——这埋下了"临界保温半径"的伏笔。</li>
+          <li><b>穿墙处</b>若保温不连续,就形成低热阻"冷桥":冷量顺管子大量漏出,局部结露结霜。</li>
+        </ul>
+        <div class="takeaway">一句话记忆:热量先被制冷剂"对流接走",再径向层层穿越管壁与保温;
+          面积随半径变化带来临界半径,穿墙不连续则成冷桥。</div>
       </div>
-    </div>
+    </section>
 
-    <details class="knowledge">
-      <summary>知识速览 —— 圆筒壁导热与管内强制对流</summary>
-      <div class="kbody">
-        <h4>物理图景</h4>
-        <p>低头看管子横截面:制冷剂在圆心,热量沿半径一圈圈往里穿(库外空气→保温→铜壁→制冷剂)。
-          圆筒面积随半径变大,所以温度分布不是直线而是<b>对数曲线</b>——这是它与 KP01 平壁最大的区别。</p>
-        <h4>核心公式</h4>
-        <p>四段串联(单位管长):R₁=1/(h<sub>i</sub>2πr₁)、R₂=ln(r₂/r₁)/(2πλ<sub>wall</sub>)、R₃=ln(r₃/r₂)/(2πλ<sub>ins</sub>)、R₄=1/(h<sub>o</sub>2πr₃);
-          q<sub>l</sub>=ΔT/ΣR。圆管独有:<b>临界半径 r<sub>cr</sub>=λ<sub>ins</sub>/h<sub>o</sub></b>——加保温增导热热阻但也增外表面积,r₂&lt;r<sub>cr</sub> 时薄保温反而增大散热。</p>
-        <h4>典型数值(本页默认参数即此例)</h4>
-        <p>铜管 r₁=8/r₂=10mm、保温到 r₃=40mm(λ=0.04)、h<sub>i</sub>=1500、h<sub>o</sub>=8,−30℃ vs +5℃:
-          R₁=0.013、R₂≈0.0001(可忽略)、R₃=5.52、R₄=0.50 → ΣR≈6.03,q<sub>l</sub>≈<b>5.8 W/m</b>;
-          r<sub>cr</sub>=5mm&lt;r₂=10mm,保温有效,占总热阻 <b>91%</b>。</p>
-        <h4>常见误区</h4>
-        <p class="trap">用平壁 δ/λ 算圆管——保温厚时误差巨大,必须用 ln 式。</p>
-        <p class="trap">以为加保温必减散热——小管/细线 r₂&lt;r<sub>cr</sub> 时"越包越漏",要校核。</p>
-        <p class="trap">漏掉穿墙冷桥——保温断开处局部热阻骤降,冷损失+结露结霜齐来(接 KP07)。</p>
-        <h4>与其他知识点</h4>
-        <p>KP01 的曲面版(δ/λ ↔ ln 式);管内 h<sub>i</sub> 是 KP06 的管内版;串联热阻思想同 KP05;冷桥结露接 KP07;q<sub>l</sub> 汇入热负荷。</p>
+    <!-- ═══════════ 第 2 节 ═══════════ -->
+    <section class="slide" data-title="核心公式">
+      <div class="panel">
+        <h3>① 圆筒壁径向导热(与平壁的标志性差别)</h3>
+        <div class="tex">Q = \frac{2\pi\lambda L\,(T_1 - T_2)}{\ln(r_2/r_1)}
+          \qquad\Longrightarrow\qquad R_{cyl} = \frac{\ln(r_2/r_1)}{2\pi\lambda L}</div>
+        <p class="fnote">平壁是 δ/λ(线性厚度),圆筒是 <b>ln(r₂/r₁)</b>(对数半径比)——温度沿半径按对数分布,曲线是"弯"的。</p>
+
+        <h3>② 管内强制对流:Dittus-Boelter 定 h_i</h3>
+        <div class="tex">Nu = 0.023\,Re^{0.8}\,Pr^{n}\;(n=0.4\,加热 / 0.3\,冷却),
+          \qquad h_i = \frac{Nu\,\lambda_{fluid}}{d}</div>
+        <p class="fnote">与 KP06 同源,几何换成管内、特征尺寸取管径 d。管内换热随流速(Re⁰·⁸)显著上升。</p>
+
+        <h3>③ 四段串联总热阻(单位管长)</h3>
+        <div class="tex">R_{tot} = \frac{1}{h_i 2\pi r_1} + \frac{\ln(r_2/r_1)}{2\pi\lambda_{wall}}
+          + \frac{\ln(r_3/r_2)}{2\pi\lambda_{ins}} + \frac{1}{h_o 2\pi r_3},
+          \qquad q_l = \frac{\Delta T}{R_{tot}}</div>
+
+        <h3>④ 临界保温半径(圆管独有的反直觉现象)</h3>
+        <div class="tex">r_{cr} = \frac{\lambda_{ins}}{h_o}</div>
+        <p class="fnote">加保温既增导热热阻(ln 项)、又增外表面积(降外对流热阻)——两者相反,存在使散热<b>最大</b>的临界半径。
+          <b>r₂ &lt; r_cr 时,初期加保温反而增大散热</b>(小管细线常见);冷库保温管 r₂ 通常远大于 r_cr,加保温有效——但小径管必须校核,避免"越包越漏"。</p>
       </div>
-    </details>
+    </section>
+
+    <!-- ═══════════ 第 3 节 ═══════════ -->
+    <section class="slide" data-title="互动实验">
+      <div class="panel viz-box">
+        <div class="view-tabs">
+          <button class="kbtn on" data-view="cross">⊙ 管道横截面</button>
+          <button class="kbtn" data-view="wall">⊥ 穿墙纵剖(冷桥)</button>
+        </div>
+        <div id="crossView" class="kp-grid cols-2">
+          <div>
+            <h3>同心圆环剖面 <small>拖最外圈手柄改保温厚度(√r 缩放)</small></h3>
+            <svg id="ringSvg" viewBox="0 0 460 420" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
+          <div>
+            <h3>沿半径温度分布 <small>对流是台阶,圆筒导热是"弯曲的对数线"</small></h3>
+            <svg id="radialSvg" viewBox="0 0 460 420" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
+        </div>
+        <div id="wallView" style="display:none">
+          <h3>穿墙节点 <small>保温断没断,一眼看出来</small></h3>
+          <svg id="bridgeSvg" viewBox="0 0 960 340" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="ctl-row">
+            <label>穿墙保温</label>
+            <button class="kbtn on" id="contBtn">连续包裹</button>
+            <button class="kbtn" id="brkBtn">断桥(裸管穿墙)</button>
+          </div>
+        </div>
+        <div class="hintline">💡 把保温拖厚,温度曲线的"弯"越弯、冷损失越小;把 h_o 调小/λ 调大,r_cr 可能跑到管径外——那时薄保温反而"越包越漏"。</div>
+      </div>
+      <div class="panel viz-box">
+        <h3>四段热阻串联条 <small>单位管长 K·m/W——保温是绝对主力</small></h3>
+        <svg id="resSvg" viewBox="0 0 960 108" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="kp-grid main-side">
+        <div class="panel viz-box">
+          <h3>临界半径寻优 <small>冷损失 q_l vs 保温外径 r₃</small></h3>
+          <svg id="critSvg" viewBox="0 0 680 330" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <div class="panel">
+          <h3>参数与读数 <small>制冷剂 −30℃ · 库外 +5℃</small></h3>
+          <div class="ctl-row"><label>保温外径 r₃</label>
+            <input type="range" id="r3" min="11" max="60" step="0.5" value="40" /><output id="r3Out"></output></div>
+          <div class="ctl-row"><label>保温 λ_ins</label>
+            <input type="range" id="lins" min="0.02" max="0.2" step="0.005" value="0.04" class="mono-track" /><output id="linsOut"></output></div>
+          <div class="ctl-row"><label>管内流速(→h_i)</label>
+            <input type="range" id="u" min="0.2" max="3" step="0.05" value="1" class="mono-track" /><output id="uOut"></output></div>
+          <div class="ctl-row"><label>外表面 h_o</label>
+            <input type="range" id="ho" min="3" max="30" step="0.5" value="8" /><output id="hoOut"></output></div>
+          <div class="cards" style="margin-top:10px">
+            <div class="card hot"><div class="lbl">冷损失 q_l</div><div class="val" id="vQl">--<small>W/m</small></div></div>
+            <div class="card"><div class="lbl">总热阻 ΣR</div><div class="val" id="vRt">--<small>K·m/W</small></div></div>
+            <div class="card"><div class="lbl">临界半径 r_cr=λ/h_o</div><div class="val" id="vRcr">--<small>mm</small></div></div>
+            <div class="card"><div class="lbl">保温热阻占比</div><div class="val" id="vShare">--<small>%</small></div></div>
+            <div class="card" id="verdictCard"><div class="lbl">保温有效性判定</div>
+              <div class="val" style="font-size:15px;white-space:normal" id="vVerdict">--</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 第 4 节 ═══════════ -->
+    <section class="slide" data-title="典型例题">
+      <div class="panel example">
+        <h3>例题:一米保温管,漏多少冷?保温真的有效吗?</h3>
+        <p class="lead" style="font-size:19px">供液铜管 r₁=8mm、r₂=10mm,外包保温到 r₃=40mm;铜 λ=380、保温 λ=0.04 W/(m·K);
+          管内 h<span class="ti">_i</span>=1500、保温外 h<span class="ti">_o</span>=8 W/(m²·K);制冷剂 −30℃、库外 +5℃。
+          求每米冷损失并校核临界半径。<b>(实验节默认参数即本题)</b></p>
+        <div class="step"><span class="n">1</span><div>管内对流热阻:
+          <div class="tex">R_1 = \frac{1}{h_i\,2\pi r_1} = \frac{1}{1500\times2\pi\times0.008} \approx 0.013\;\mathrm{K{\cdot}m/W}</div></div></div>
+        <div class="step"><span class="n">2</span><div>铜管壁(可忽略)与保温层(主阻):
+          <div class="tex">R_2 = \frac{\ln(10/8)}{2\pi\times380} \approx 9\times10^{-5},\qquad
+            R_3 = \frac{\ln(40/10)}{2\pi\times0.04} = \frac{1.386}{0.251} \approx 5.52</div></div></div>
+        <div class="step"><span class="n">3</span><div>外部对流与总热阻:
+          <div class="tex">R_4 = \frac{1}{8\times2\pi\times0.040} \approx 0.497,\qquad
+            R_{tot} \approx 0.013+0.0001+5.52+0.497 = 6.03\;\mathrm{K{\cdot}m/W}</div></div></div>
+        <div class="step"><span class="n">4</span><div>单位管长冷损失:
+          <div class="tex">q_l = \frac{\Delta T}{R_{tot}} = \frac{5-(-30)}{6.03} = \frac{35}{6.03} \approx 5.8\;\mathrm{W/m}</div></div></div>
+        <div class="step"><span class="n">5</span><div>临界半径校核:
+          <div class="tex">r_{cr} = \frac{\lambda_{ins}}{h_o} = \frac{0.04}{8} = 5\;\mathrm{mm} \;&lt;\; r_2 = 10\;\mathrm{mm}\;✓</div></div></div>
+        <div class="answer">✅ 每米冷损失约 <b>5.8 W</b>;r₂ &gt; r_cr,加保温确实减损(有效);
+          保温层占总热阻 5.52/6.03 ≈ <b>91%</b>,是绝对主力。若把保温减薄到接近 r_cr,冷损失会显著上升。</div>
+      </div>
+    </section>
+
+    <!-- ═══════════ 第 5 节 ═══════════ -->
+    <section class="slide" data-title="误区与小结">
+      <div class="panel">
+        <h3>常见误区</h3>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">用平壁公式算圆管?</span> →
+          <span class="right">✔</span> 圆管是 <b>ln(r₂/r₁)</b> 而非 δ/λ;保温厚时差别巨大。</div></div>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">加保温一定减少散热?</span> →
+          <span class="right">✔</span> 存在<b>临界半径</b> r_cr=λ/h_o;小管细线在 r₂&lt;r_cr 时"越包越漏"。</div></div>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">管内对流热阻可忽略?</span> →
+          <span class="right">✔</span> 低流速/大管径时 1/(h_iA_i) 不可忽略,须先用 Dittus-Boelter 定 h_i。</div></div>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">穿墙节点随便包?</span> →
+          <span class="right">✔</span> 穿墙管是<b>冷桥高发区</b>:保温必须连续 + 隔热套管 + 断桥处理。</div></div>
+        <h3 style="margin-top:20px">与其他知识点的联系</h3>
+        <p>KP01 的曲面版(δ/λ ↔ ln 式对照);管内 h<span class="ti">_i</span> 是 KP06 的管内版(注意 n 取 0.4/0.3 分加热冷却);
+          串联热阻与 UA 思路同 KP05;冷桥导致表面低于露点 → 结露结霜接 KP07;q<span class="ti">_l</span> 汇总为管路冷损失负荷。</p>
+        <div class="link-row">
+          <a href="./kp01.html">KP01 平壁导热</a><a href="./kp06.html">KP06 强制对流</a>
+          <a href="./kp05.html">KP05 换热器</a><a href="./kp07.html">KP07 霜层热阻</a>
+        </div>
+        <div class="takeaway">要点小结:圆筒热阻 = ln(r₂/r₁)/2πλL;四段串联求 q_l;
+          临界半径 r_cr=λ/h_o 必须校核;穿墙保温要连续——冷桥是冷损失与结露的高发点。</div>
+      </div>
+    </section>
   </div>
 
   <script type="module">
@@ -132,15 +191,13 @@
 
     function compute() {
       const r = resist();
-      const rcr = state.lins / state.ho * 1000;         // mm
-      // 各界面温度 (热量由外向内流)
-      const Ts3 = T_AIR - r.ql * r.Rd;                  // 保温外表面
-      const Ts2 = Ts3 - r.ql * r.Rc;                    // 铜壁外
-      const Ts1 = Ts2 - r.ql * r.Rb;                    // 铜壁内
+      const rcr = state.lins / state.ho * 1000;
+      const Ts3 = T_AIR - r.ql * r.Rd;
+      const Ts2 = Ts3 - r.ql * r.Rc;
+      const Ts1 = Ts2 - r.ql * r.Rb;
       return { ...r, rcr, Ts3, Ts2, Ts1 };
     }
 
-    // 温度沿半径 (mm) — 圆筒段用对数插值
     function Tat(rmm, c) {
       if (rmm <= R1MM) return T_REF;
       if (rmm <= R2MM) return c.Ts1 + (c.Ts2 - c.Ts1) * Math.log(rmm / R1MM) / Math.log(R2MM / R1MM);
@@ -151,37 +208,37 @@
     // ---------------- 同心圆环 ----------------
     const ring = $("#ringSvg");
     const CX = 230, CY = 200, RPX = 172;
-    const rr = (rmm) => Math.sqrt(rmm / 62) * RPX;      // √r 缩放
+    const rr = (rmm) => Math.sqrt(rmm / 62) * RPX;
     function drawRings(c) {
       ring.innerHTML = "";
-      // 外部空气圈底
-      svgEl("circle", { cx: CX, cy: CY, r: RPX + 10, fill: "rgba(66,32,14,0.25)" }, ring);
-      // 保温 → 铜壁 → 制冷剂 (从外往里画, 环带按温度着色)
+      svgEl("circle", { cx: CX, cy: CY, r: RPX + 10, fill: "#fdf0e6" }, ring);
       for (let i = 30; i >= 1; i--) {
         const rmm = R2MM + (state.r3 - R2MM) * (i / 30);
         svgEl("circle", { cx: CX, cy: CY, r: rr(rmm), fill: tempColor(Tat(rmm, c), -32, 8) }, ring);
       }
-      svgEl("circle", { cx: CX, cy: CY, r: rr(R2MM), fill: "#b8793f" }, ring);         // 铜壁
+      svgEl("circle", { cx: CX, cy: CY, r: rr(R2MM), fill: "#c98a4e" }, ring);
       svgEl("circle", { cx: CX, cy: CY, r: rr(R1MM), fill: tempColor(T_REF, -32, 8) }, ring);
-      svgEl("text", { x: CX, y: CY + 5, "text-anchor": "middle", "font-size": "13",
-        "font-family": "Consolas", fill: "#dff2ff", "font-weight": "700", text: `${T_REF}℃` }, ring);
-      // 圈界虚线 + 标注
+      svgEl("text", { x: CX, y: CY + 5, "text-anchor": "middle", "font-size": "15",
+        "font-family": "Consolas", fill: "#fff", "font-weight": "700", text: `${T_REF}℃` }, ring);
       [[R1MM, "r₁"], [R2MM, "r₂"], [state.r3, "r₃"]].forEach(([rmm, lbl]) => {
         svgEl("circle", { cx: CX, cy: CY, r: rr(rmm), fill: "none",
-          stroke: "rgba(230,242,255,0.55)", "stroke-dasharray": "3 4" }, ring);
+          stroke: "rgba(255,255,255,0.75)", "stroke-dasharray": "3 4", "stroke-width": 1.6 }, ring);
         svgEl("text", { x: CX + rr(rmm) * 0.72, y: CY - rr(rmm) * 0.72, class: "svg-note",
-          fill: "#e6f2ff", text: `${lbl}=${fmt(rmm, 0)}mm` }, ring);
+          fill: "#17293d", "font-weight": "700",
+          style: "paint-order:stroke;stroke:#fff;stroke-width:3px", text: `${lbl}=${fmt(rmm, 0)}mm` }, ring);
       });
-      svgEl("text", { x: CX, y: CY - rr((R2MM + state.r3) / 2) + 4, "text-anchor": "middle",
-        class: "svg-note", fill: "#10202e", "font-weight": "700", text: "保温层" }, ring);
-      svgEl("text", { x: 26, y: 34, class: "svg-note", fill: "#ffb28a", text: `库外空气 +${T_AIR}℃` }, ring);
-      svgEl("text", { x: CX, y: 404, "text-anchor": "middle", class: "svg-note",
-        text: "冷量由外圈一层层向圆心渗入 · 拖最外圈改厚度" }, ring);
-      // 拖拽手柄 (右侧外缘)
+      svgEl("text", { x: CX, y: CY - rr((R2MM + state.r3) / 2) + 5, "text-anchor": "middle",
+        class: "svg-note", fill: "#17293d", "font-weight": "700",
+        style: "paint-order:stroke;stroke:#fff;stroke-width:3px", text: "保温层" }, ring);
+      svgEl("text", { x: 24, y: 32, class: "svg-note", fill: "#b3400e", "font-weight": "700",
+        text: `库外空气 +${T_AIR}℃` }, ring);
+      svgEl("text", { x: CX, y: 406, "text-anchor": "middle", class: "svg-note",
+        text: "冷量由外圈一层层向圆心渗入 · 拖右侧手柄改保温厚度" }, ring);
       const hx = CX + rr(state.r3);
       const h = svgEl("g", { class: "ring-handle" }, ring);
-      svgEl("circle", { cx: hx, cy: CY, r: 11, fill: "rgba(255,179,107,0.25)", stroke: "#ffb36b", "stroke-width": 2 }, h);
-      svgEl("text", { x: hx, y: CY + 4, "text-anchor": "middle", "font-size": "12", fill: "#ffd9b3", text: "⇔" }, h);
+      svgEl("circle", { cx: hx, cy: CY, r: 13, fill: "#fff", stroke: "#d94f16", "stroke-width": 3 }, ring);
+      svgEl("text", { x: hx, y: CY + 5, "text-anchor": "middle", "font-size": "14", fill: "#d94f16",
+        "font-weight": "700", text: "⇔" }, ring);
       h.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         const move = (ev) => {
@@ -203,36 +260,34 @@
     const rad = $("#radialSvg");
     function drawRadial(c) {
       rad.innerHTML = "";
-      const X = scale([0, 62], [56, 440]);
-      const Y = scale([-33, 9], [360, 30]);
-      svgEl("line", { x1: 56, y1: 360, x2: 440, y2: 360, stroke: "#39516d" }, rad);
-      svgEl("line", { x1: 56, y1: 360, x2: 56, y2: 26, stroke: "#39516d" }, rad);
+      const X = scale([0, 62], [60, 440]);
+      const Y = scale([-33, 9], [360, 34]);
+      svgEl("line", { x1: 60, y1: 360, x2: 440, y2: 360, stroke: "#8aa0b8", "stroke-width": 1.5 }, rad);
+      svgEl("line", { x1: 60, y1: 360, x2: 60, y2: 30, stroke: "#8aa0b8", "stroke-width": 1.5 }, rad);
       [-30, -20, -10, 0].forEach((t) => {
-        svgEl("text", { x: 48, y: Y(t) + 4, "text-anchor": "end", class: "svg-note", text: t + "°" }, rad);
-        svgEl("line", { x1: 54, y1: Y(t), x2: 440, y2: Y(t), stroke: "rgba(90,130,180,0.1)" }, rad);
+        svgEl("text", { x: 52, y: Y(t) + 5, "text-anchor": "end", class: "svg-note", text: t + "°" }, rad);
+        svgEl("line", { x1: 58, y1: Y(t), x2: 440, y2: Y(t), stroke: "rgba(70,110,160,0.12)" }, rad);
       });
-      // 分界竖线
       [[R1MM, "r₁"], [R2MM, "r₂"], [state.r3, "r₃"]].forEach(([rmm, lbl]) => {
-        svgEl("line", { x1: X(rmm), y1: 360, x2: X(rmm), y2: 30, stroke: "rgba(120,170,230,0.2)", "stroke-dasharray": "4 5" }, rad);
-        svgEl("text", { x: X(rmm), y: 376, "text-anchor": "middle", class: "svg-note", text: lbl }, rad);
+        svgEl("line", { x1: X(rmm), y1: 360, x2: X(rmm), y2: 34, stroke: "rgba(70,110,160,0.22)", "stroke-dasharray": "4 5" }, rad);
+        svgEl("text", { x: X(rmm), y: 378, "text-anchor": "middle", class: "svg-note", "font-weight": "700", text: lbl }, rad);
       });
-      // 曲线: 制冷剂平线 → (管内膜台阶) → 铜壁 → 保温对数弯 → (外膜台阶) → 空气平线
       let d = `M${X(0)},${Y(T_REF)} L${X(R1MM - 1.2)},${Y(T_REF)}`;
-      d += ` L${X(R1MM)},${Y(c.Ts1)}`;                       // 管内对流台阶
+      d += ` L${X(R1MM)},${Y(c.Ts1)}`;
       for (let rmm = R1MM; rmm <= state.r3; rmm += 0.4) d += ` L${X(rmm)},${Y(Tat(rmm, c))}`;
-      d += ` L${X(state.r3 + 1.6)},${Y(T_AIR)} L${X(62)},${Y(T_AIR)}`;   // 外膜台阶
-      svgEl("path", { d, fill: "none", stroke: "#ffcf9e", "stroke-width": 2.8,
-        filter: "drop-shadow(0 0 5px rgba(255,150,80,0.5))" }, rad);
-      // 标注
-      svgEl("text", { x: X(3), y: Y(T_REF) - 8, class: "svg-note", fill: "#9fd4ff", text: "制冷剂 −30℃" }, rad);
-      svgEl("text", { x: X(R1MM) + 4, y: (Y(T_REF) + Y(c.Ts1)) / 2, class: "svg-note", fill: "#8fc2f0",
+      d += ` L${X(state.r3 + 1.6)},${Y(T_AIR)} L${X(62)},${Y(T_AIR)}`;
+      svgEl("path", { d, fill: "none", stroke: "#d94f16", "stroke-width": 3.5 }, rad);
+      svgEl("text", { x: X(2), y: Y(T_REF) - 10, class: "svg-note", fill: "#0d4f8f", "font-weight": "700",
+        text: "制冷剂 −30℃" }, rad);
+      svgEl("text", { x: X(R1MM) + 5, y: (Y(T_REF) + Y(c.Ts1)) / 2, class: "svg-note", fill: "#0d4f8f",
         text: `管内膜台阶 ${fmt(c.ql * c.Ra, 2)}℃` }, rad);
-      svgEl("text", { x: X((R2MM + state.r3) / 2), y: Y(Tat((R2MM + state.r3) / 2, c)) - 12,
-        "text-anchor": "middle", class: "svg-note", fill: "#ffd9b8", text: "保温段:对数弯曲(不是直线!)" }, rad);
-      svgEl("text", { x: X(state.r3) + 4, y: (Y(c.Ts3) + Y(T_AIR)) / 2 + 4, class: "svg-note", fill: "#ffb28a",
+      svgEl("text", { x: X((R2MM + state.r3) / 2), y: Y(Tat((R2MM + state.r3) / 2, c)) - 14,
+        "text-anchor": "middle", class: "svg-note", fill: "#a34410", "font-weight": "700",
+        text: "保温段:对数弯曲(不是直线!)" }, rad);
+      svgEl("text", { x: X(state.r3) + 5, y: (Y(c.Ts3) + Y(T_AIR)) / 2 + 5, class: "svg-note", fill: "#b3400e",
         text: `外膜台阶 ${fmt(c.ql * c.Rd, 1)}℃` }, rad);
       svgEl("text", { x: 250, y: 404, "text-anchor": "middle", class: "svg-note",
-        text: "对流=陡台阶 · 圆筒导热=对数曲线 —— 与 KP01 平壁折线对照" }, rad);
+        text: "对流 = 陡台阶 · 圆筒导热 = 对数曲线 —— 与 KP01 平壁折线对照" }, rad);
     }
 
     // ---------------- 热阻串联条 ----------------
@@ -240,12 +295,12 @@
     function drawRes(c) {
       res.innerHTML = "";
       const items = [
-        { n: "管内对流 1/(h·2πr₁)", R: c.Ra, col: "#53c1ff" },
-        { n: "铜壁 ln/2πλ", R: c.Rb, col: "#b8793f" },
-        { n: "保温层 ln(r₃/r₂)/2πλ", R: c.Rc, col: "#c9a04a" },
-        { n: "外对流 1/(h·2πr₃)", R: c.Rd, col: "#ff9a5c" },
+        { n: "管内对流 1/(h·2πr₁)", R: c.Ra, col: "#6aa5d8" },
+        { n: "铜壁 ln/2πλ", R: c.Rb, col: "#c98a4e" },
+        { n: "保温层 ln(r₃/r₂)/2πλ", R: c.Rc, col: "#e8c777" },
+        { n: "外对流 1/(h·2πr₃)", R: c.Rd, col: "#f0a273" },
       ];
-      const MINW = 60, avail = 810;
+      const MINW = 64, avail = 810;
       let flexR = 0, fixedW = 0;
       const raw = items.map((it) => (it.R / c.Rt) * avail);
       items.forEach((it, i) => { if (raw[i] < MINW) fixedW += MINW; else flexR += it.R; });
@@ -253,21 +308,21 @@
       let x = 75;
       items.forEach((it, i) => {
         const w = raw[i] < MINW ? MINW : it.R * kk;
-        svgEl("rect", { x, y: 24, width: w - 3, height: 30, rx: 6, fill: it.col, opacity: 0.85 }, res);
-        svgEl("text", { x: x + w / 2, y: 43, "text-anchor": "middle", class: "svg-note",
-          fill: "#0d141f", "font-weight": "700", text: `${fmt(it.R / c.Rt * 100, it.R / c.Rt < 0.01 ? 1 : 0)}%` }, res);
-        svgEl("text", { x: x + w / 2, y: 72, "text-anchor": "middle", class: "svg-note", text: it.n }, res);
+        svgEl("rect", { x, y: 24, width: w - 3, height: 32, rx: 7, fill: it.col, stroke: "#8898a8" }, res);
+        svgEl("text", { x: x + w / 2, y: 45, "text-anchor": "middle", class: "svg-note",
+          fill: "#243748", "font-weight": "700", text: `${fmt(it.R / c.Rt * 100, it.R / c.Rt < 0.01 ? 1 : 0)}%` }, res);
+        svgEl("text", { x: x + w / 2, y: 78, "text-anchor": "middle", class: "svg-note", text: it.n }, res);
         x += w;
       });
-      svgEl("text", { x: 480, y: 96, "text-anchor": "middle", class: "svg-note",
+      svgEl("text", { x: 480, y: 102, "text-anchor": "middle", class: "svg-note", "font-size": "15",
         text: `ΣR = ${fmt(c.Rt, 2)} K·m/W → q_l = 35/${fmt(c.Rt, 2)} = ${fmt(c.ql, 1)} W/m` }, res);
     }
 
-    // ---------------- 临界半径曲线 ----------------
+    // ---------------- 临界半径 ----------------
     const crit = $("#critSvg");
     function drawCrit(c) {
       crit.innerHTML = "";
-      const X = scale([R2MM, 60], [64, 650]);
+      const X = scale([R2MM, 60], [68, 650]);
       let qMax = 0;
       const pts = [];
       for (let r3 = R2MM; r3 <= 60; r3 += 0.4) {
@@ -275,26 +330,24 @@
         qMax = Math.max(qMax, q);
         pts.push([r3, q]);
       }
-      const Y = scale([0, qMax * 1.12], [290, 28]);
-      svgEl("line", { x1: 64, y1: 290, x2: 650, y2: 290, stroke: "#39516d" }, crit);
-      svgEl("line", { x1: 64, y1: 290, x2: 64, y2: 24, stroke: "#39516d" }, crit);
-      [10, 20, 30, 40, 50, 60].forEach((r) => svgEl("text", { x: X(r), y: 308, "text-anchor": "middle", class: "svg-note", text: r + "mm" }, crit));
-      svgEl("text", { x: 70, y: 18, class: "svg-note", text: "冷损失 q_l (W/m)" }, crit);
+      const Y = scale([0, qMax * 1.12], [290, 30]);
+      svgEl("line", { x1: 68, y1: 290, x2: 650, y2: 290, stroke: "#8aa0b8", "stroke-width": 1.5 }, crit);
+      svgEl("line", { x1: 68, y1: 290, x2: 68, y2: 26, stroke: "#8aa0b8", "stroke-width": 1.5 }, crit);
+      [10, 20, 30, 40, 50, 60].forEach((r) => svgEl("text", { x: X(r), y: 310, "text-anchor": "middle", class: "svg-note", text: r + "mm" }, crit));
+      svgEl("text", { x: 74, y: 20, class: "svg-note", "font-size": "15", text: "冷损失 q_l (W/m)" }, crit);
       svgEl("path", { d: pts.map(([r3, q], i) => (i ? "L" : "M") + X(r3) + "," + Y(q)).join(""),
-        fill: "none", stroke: "#53c1ff", "stroke-width": 2.6 }, crit);
-      // r_cr 标注
+        fill: "none", stroke: "#1f7fd4", "stroke-width": 3 }, crit);
       if (c.rcr > R2MM && c.rcr < 60) {
-        svgEl("line", { x1: X(c.rcr), y1: 290, x2: X(c.rcr), y2: 28, stroke: "rgba(255,92,74,0.5)", "stroke-dasharray": "5 4" }, crit);
-        svgEl("text", { x: X(c.rcr), y: 44, "text-anchor": "middle", class: "svg-note", fill: "#ff9a86",
-          text: `r_cr=${fmt(c.rcr, 1)}mm 拐点:此前"越包越漏"!` }, crit);
+        svgEl("line", { x1: X(c.rcr), y1: 290, x2: X(c.rcr), y2: 30, stroke: "#c93a2a", "stroke-dasharray": "6 4", "stroke-width": 2 }, crit);
+        svgEl("text", { x: X(c.rcr), y: 46, "text-anchor": "middle", class: "svg-note", fill: "#a32e20",
+          "font-weight": "700", text: `r_cr=${fmt(c.rcr, 1)}mm 拐点:此前"越包越漏"!` }, crit);
       } else {
-        svgEl("text", { x: 350, y: 44, "text-anchor": "middle", class: "svg-note", fill: "#7fe3a8",
-          text: `r_cr=${fmt(c.rcr, 1)}mm < r₂=${R2MM}mm → 全程加保温有效(冷库常态)` }, crit);
+        svgEl("text", { x: 350, y: 46, "text-anchor": "middle", class: "svg-note", fill: "#0f6b36",
+          "font-weight": "700", text: `r_cr=${fmt(c.rcr, 1)}mm < r₂=${R2MM}mm → 全程加保温有效(冷库常态)` }, crit);
       }
-      // 当前 r3 工作点
-      svgEl("circle", { cx: X(state.r3), cy: Y(c.ql), r: 6.5, fill: "#ffe6cd", stroke: "#e0561f", "stroke-width": 2 }, crit);
-      svgEl("text", { x: X(state.r3) + 10, y: Y(c.ql) - 10, class: "svg-note", fill: "#ffd9b8",
-        text: `当前 r₃=${fmt(state.r3, 0)}mm → ${fmt(c.ql, 1)} W/m` }, crit);
+      svgEl("circle", { cx: X(state.r3), cy: Y(c.ql), r: 7, fill: "#fff", stroke: "#d94f16", "stroke-width": 3 }, crit);
+      svgEl("text", { x: clamp(X(state.r3) + 12, 80, 460), y: Y(c.ql) - 12, class: "svg-note",
+        fill: "#a34410", "font-weight": "700", text: `当前 r₃=${fmt(state.r3, 0)}mm → ${fmt(c.ql, 1)} W/m` }, crit);
     }
 
     // ---------------- 穿墙冷桥 ----------------
@@ -303,56 +356,50 @@
       br.innerHTML = "";
       const defs = svgEl("defs", {}, br);
       const glow = svgEl("filter", { id: "glow" }, defs);
-      svgEl("feGaussianBlur", { stdDeviation: 7, result: "b" }, glow);
+      svgEl("feGaussianBlur", { stdDeviation: 6, result: "b" }, glow);
       const merge = svgEl("feMerge", {}, glow);
       svgEl("feMergeNode", { in: "b" }, merge);
       svgEl("feMergeNode", { in: "SourceGraphic" }, merge);
-      // 库墙
-      svgEl("rect", { x: 420, y: 20, width: 120, height: 300, fill: "#39434d" }, br);
-      svgEl("text", { x: 480, y: 40, "text-anchor": "middle", class: "svg-note", text: "库墙" }, br);
-      svgEl("text", { x: 200, y: 40, class: "svg-note", fill: "#9fd4ff", text: "库内 −18℃" }, br);
-      svgEl("text", { x: 700, y: 40, "text-anchor": "end", class: "svg-note", fill: "#ffb28a", text: "库外 +5℃ 湿空气" }, br);
-      // 管子
-      svgEl("rect", { x: 60, y: 158, width: 840, height: 24, fill: "#b8793f" }, br);
-      // 保温 (库内外两段)
-      svgEl("rect", { x: 60, y: 138, width: 360, height: 64, rx: 10, fill: "#c9a04a", opacity: 0.9 }, br);
-      const outIns = svgEl("rect", { x: state.bridge ? 590 : 540, y: 138, width: state.bridge ? 310 : 360,
-        height: 64, rx: 10, fill: "#c9a04a", opacity: 0.9 }, br);
-      svgEl("text", { x: 240, y: 175, "text-anchor": "middle", class: "svg-note", fill: "#10202e",
+      svgEl("rect", { x: 420, y: 20, width: 120, height: 300, fill: "#c4d2e0" }, br);
+      svgEl("text", { x: 480, y: 44, "text-anchor": "middle", class: "svg-note", "font-weight": "700", text: "库墙" }, br);
+      svgEl("text", { x: 200, y: 44, class: "svg-note", fill: "#0d4f8f", "font-weight": "700", text: "库内 −18℃" }, br);
+      svgEl("text", { x: 700, y: 44, "text-anchor": "end", class: "svg-note", fill: "#b3400e", "font-weight": "700",
+        text: "库外 +5℃ 湿空气" }, br);
+      svgEl("rect", { x: 60, y: 158, width: 840, height: 24, fill: "#c98a4e" }, br);
+      svgEl("rect", { x: 60, y: 138, width: 360, height: 64, rx: 10, fill: "#e8c777", stroke: "#b99a3a" }, br);
+      svgEl("rect", { x: state.bridge ? 590 : 540, y: 138, width: state.bridge ? 310 : 360,
+        height: 64, rx: 10, fill: "#e8c777", stroke: "#b99a3a" }, br);
+      svgEl("text", { x: 240, y: 176, "text-anchor": "middle", class: "svg-note", fill: "#5a4210",
         "font-weight": "700", text: "保温层" }, br);
       if (!state.bridge) {
-        // 连续: 穿墙段也包着
-        svgEl("rect", { x: 420, y: 138, width: 120, height: 64, fill: "#c9a04a", opacity: 0.9 }, br);
-        svgEl("text", { x: 480, y: 175, "text-anchor": "middle", class: "svg-note", fill: "#10202e",
+        svgEl("rect", { x: 420, y: 138, width: 120, height: 64, fill: "#e8c777", stroke: "#b99a3a" }, br);
+        svgEl("text", { x: 480, y: 176, "text-anchor": "middle", class: "svg-note", fill: "#5a4210",
           "font-weight": "700", text: "连续包裹 ✓" }, br);
-        svgEl("text", { x: 480, y: 260, "text-anchor": "middle", class: "svg-note", fill: "#7fe3a8",
-          text: `穿墙段冷损失正常:q_l ≈ ${fmt(c.ql, 1)} W/m,无结露` }, br);
+        svgEl("text", { x: 480, y: 262, "text-anchor": "middle", class: "svg-note", fill: "#0f6b36",
+          "font-weight": "700", text: `穿墙段冷损失正常:q_l ≈ ${fmt(c.ql, 1)} W/m,无结露` }, br);
       } else {
-        // 断桥: 裸管发光 + 泄漏粒子 + 结露
-        svgEl("rect", { x: 540, y: 150, width: 50, height: 40, fill: "#b8793f",
-          filter: "url(#glow)", stroke: "#7fdcff", "stroke-width": 2 }, br);
-        const bare = resist(R2MM);          // 裸管(无保温)单位长损失
+        svgEl("rect", { x: 540, y: 150, width: 50, height: 40, fill: "#c98a4e",
+          filter: "url(#glow)", stroke: "#1f7fd4", "stroke-width": 2.5 }, br);
+        const bare = resist(R2MM);
         for (let i = 0; i < 12; i++) {
           const a = (i / 12) * Math.PI * 2;
           svgEl("circle", { cx: 565 + Math.cos(a) * (28 + (i % 3) * 12), cy: 170 + Math.sin(a) * (26 + (i % 4) * 9),
-            r: 2.4, fill: "rgba(140,220,255,0.75)", filter: "url(#glow)" }, br);
+            r: 2.8, fill: "rgba(31,127,212,0.75)", filter: "url(#glow)" }, br);
         }
-        svgEl("text", { x: 565, y: 130, "text-anchor": "middle", class: "svg-note", fill: "#7fdcff",
-          "font-weight": "700", text: "⚠ 断桥发光:裸管段" }, br);
-        // 结露水珠
+        svgEl("text", { x: 565, y: 128, "text-anchor": "middle", class: "svg-note", fill: "#0d4f8f",
+          "font-weight": "700", text: "⚠ 断桥:裸管段发光泄冷" }, br);
         for (let i = 0; i < 7; i++) {
-          svgEl("circle", { cx: 548 + i * 8, cy: 196 + (i % 2) * 5, r: 2.6, fill: "rgba(150,210,255,0.9)" }, br);
+          svgEl("circle", { cx: 548 + i * 8, cy: 198 + (i % 2) * 5, r: 2.8, fill: "#4a94d8" }, br);
         }
-        svgEl("text", { x: 565, y: 236, "text-anchor": "middle", class: "svg-note", fill: "#ffb28a",
-          text: `裸管段局部 q_l ≈ ${fmt(bare.ql, 0)} W/m(约 ${fmt(bare.ql / c.ql, 0)} 倍!)` }, br);
-        svgEl("text", { x: 565, y: 258, "text-anchor": "middle", class: "svg-note", fill: "#ff9a86",
+        svgEl("text", { x: 565, y: 238, "text-anchor": "middle", class: "svg-note", fill: "#a32e20",
+          "font-weight": "700", text: `裸管段局部 q_l ≈ ${fmt(bare.ql, 0)} W/m(约 ${fmt(bare.ql / c.ql, 0)} 倍!)` }, br);
+        svgEl("text", { x: 565, y: 260, "text-anchor": "middle", class: "svg-note", fill: "#b3400e",
           text: "表面低于露点 → 结露结霜(接 KP07)→ 保温受潮恶化" }, br);
-        svgEl("text", { x: 480, y: 300, "text-anchor": "middle", class: "svg-note",
+        svgEl("text", { x: 480, y: 306, "text-anchor": "middle", class: "svg-note",
           text: "对策:连续包裹 + 隔热套管 + 断桥处理" }, br);
       }
     }
 
-    // ---------------- 汇总 ----------------
     function update() {
       const c = compute();
       drawRings(c);

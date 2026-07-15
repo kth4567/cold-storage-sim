@@ -94,12 +94,70 @@ function tagKP(mesh, ids) {
   return mesh;
 }
 
+// ---------------------------------------------------------------- 知识云
+// 每个部位悬浮一朵可见的"知识云", 准星对准 → 出现"点击查看"按钮 → 左键确认弹窗。
+const KP_CLOUDS = [
+  { pos: [6.5, 2.4, -4.0],    ids: ["KP01"], label: "墙体导热" },
+  { pos: [-3.5, 5.45, -7.0],  ids: ["KP02"], label: "屋面辐射" },
+  { pos: [2.0, 0.8, -7.5],    ids: ["KP03"], label: "地坪渗透" },
+  { pos: [1.0, 2.9, 4.45],    ids: ["KP04"], label: "库门对流" },
+  { pos: [0, 4.72, -3.1],     ids: ["KP05", "KP07"], label: "蒸发器·结霜" },
+  { pos: [0, 4.72, -11.35],   ids: ["KP06"], label: "风机对流" },
+  { pos: [1.15, 5.3, -7.5],   ids: ["KP11"], label: "管道保温" },
+  { pos: [-3.9, 3.75, -8.75], ids: CARGO_KP, label: "货物降温" },
+  { pos: [3.9, 3.75, -5.5],   ids: CARGO_KP, label: "货物降温" },
+];
+const kpClouds = [];          // {sprite, ids, label, baseY, phase}
+let hoveredCloud = null;
+
+function cloudTexture(kpIds, label) {
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 256;
+  const g = c.getContext("2d");
+  // 云朵本体 (白色圆簇 + 淡蓝描边)
+  const puffs = [[150, 150, 62], [230, 118, 74], [320, 138, 66], [390, 160, 50], [255, 172, 68], [170, 178, 50]];
+  g.fillStyle = "rgba(255,255,255,0.96)";
+  g.strokeStyle = "rgba(110,170,230,0.9)";
+  g.lineWidth = 6;
+  puffs.forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); });
+  puffs.forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke(); });
+  g.fillStyle = "rgba(255,255,255,0.96)";
+  puffs.forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r - 4, 0, 7); g.fill(); });
+  // 雪花 + 文案
+  g.fillStyle = "#1668b8";
+  g.font = "700 52px 'Microsoft YaHei'";
+  g.textAlign = "center";
+  g.fillText("❄ " + kpIds[0] + (kpIds.length > 1 ? " +" + (kpIds.length - 1) : ""), 268, 138);
+  g.font = "700 40px 'Microsoft YaHei'";
+  g.fillStyle = "#17415c";
+  g.fillText(label, 268, 186);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function addKnowledgeClouds() {
+  KP_CLOUDS.forEach((def, i) => {
+    const mat = new THREE.SpriteMaterial({
+      map: cloudTexture(def.ids, def.label),
+      transparent: true, opacity: 0.92, depthWrite: false,
+    });
+    const s = new THREE.Sprite(mat);
+    s.position.set(def.pos[0], def.pos[1], def.pos[2]);
+    s.scale.set(1.05, 0.53, 1);
+    s.userData.kpCloud = { ids: def.ids, label: def.label };
+    s.renderOrder = 5;
+    scene.add(s);
+    kpClouds.push({ sprite: s, ids: def.ids, label: def.label, baseY: def.pos[1], phase: i * 1.37 });
+  });
+}
+
 const ui = {};
 ["start", "startBtn", "targetLabel", "doorState", "doorDot", "miniDoor", "miniPlayer",
  "tIn", "rhIn", "tOut", "rhOut", "tProd", "tEvap", "frost", "compDot", "compState",
  "qCool", "qDoor", "qEnv", "power", "cop", "energy", "simClock", "alarmBanner",
  "connDot", "connText", "chart", "defrostBtn", "resetBtn", "spawnBtn",
- "kpModal", "kpModalBody", "kpModalClose"]
+ "kpModal", "kpModalBody", "kpModalClose", "kpPrompt"]
   .forEach((id) => { ui[id] = document.getElementById(id); });
 
 // ---------------------------------------------------------------- 材质 (程序化贴图)
@@ -1116,11 +1174,18 @@ function checkCrosshair() {
     else if (m.userData.grabbable) currentTarget = { kind: "body", mesh: m };
   }
 
-  // 第二道射线: 传热学知识点热点 (更远, 覆盖屋面/吊顶管线)
-  raycaster.far = 9.5;
-  const kpHits = raycaster.intersectObjects(
-    [...kpTargets, ...dynMeshes.filter((m) => m.visible)], false);
-  currentKp = kpHits.length ? (kpHits[0].object.userData.kp || null) : null;
+  // 知识云射线: 准星对准云朵 → 出现"点击查看"确认按钮
+  raycaster.far = 13;
+  const cloudHits = raycaster.intersectObjects(kpClouds.map((c) => c.sprite), false);
+  hoveredCloud = cloudHits.length ? cloudHits[0].object.userData.kpCloud : null;
+  currentKp = hoveredCloud ? hoveredCloud.ids : null;
+  if (hoveredCloud && controls.isLocked && !heldName) {
+    const names = hoveredCloud.ids.map((id) => KP_BY_ID[id]?.title).filter(Boolean);
+    ui.kpPrompt.innerHTML = `🧊 <b>${hoveredCloud.label}</b> · ${names.length > 1 ? names.length + " 个知识点" : names[0]}<span>点击鼠标左键查看</span>`;
+    ui.kpPrompt.classList.add("active");
+  } else {
+    ui.kpPrompt.classList.remove("active");
+  }
 
   let label = "";
   if (performance.now() < noteUntil) label = noteText;
@@ -1128,14 +1193,6 @@ function checkCrosshair() {
   else if (currentTarget?.kind === "door") label = doorTarget.d > 0.4 ? "按 E 关门" : "按 E 开门";
   else if (currentTarget?.kind === "alarm") label = "按 E 触发紧急报警";
   else if (currentTarget?.kind === "body") label = "按 F 抓取";
-
-  if (currentKp && performance.now() >= noteUntil) {
-    const first = KP_BY_ID[currentKp[0]];
-    const kpHint = currentKp.length > 1
-      ? `Q 传热知识 (${currentKp.length} 项)`
-      : `Q 传热知识 · ${first ? first.title : currentKp[0]}`;
-    label = label ? `${label} · ${kpHint}` : `按 ${kpHint}`;
-  }
   ui.targetLabel.textContent = label;
   ui.targetLabel.classList.toggle("active", Boolean(label));
 }
@@ -1143,6 +1200,7 @@ function checkCrosshair() {
 // ---------------------------------------------------------------- 知识点浮窗
 let kpModalOpen = false;
 function openKpModal(ids) {
+  ui.kpPrompt.classList.remove("active");
   ui.kpModalBody.innerHTML = ids.map((id) => {
     const k = KP_BY_ID[id];
     if (!k) return "";
@@ -1181,8 +1239,8 @@ document.addEventListener("keydown", (e) => {
       if (currentTarget?.kind === "door") send({ c: "door" });
       else if (currentTarget?.kind === "alarm") triggerManualAlarm();
       break;
-    case "KeyQ":
-      if (controls.isLocked && currentKp) openKpModal(currentKp);
+    case "KeyQ":                          // Q = 点击的键盘替代
+      if (controls.isLocked && hoveredCloud) openKpModal(hoveredCloud.ids);
       break;
     case "KeyF": {
       const pd = camPosDir();
@@ -1208,6 +1266,8 @@ document.addEventListener("mousedown", (e) => {
   if (heldName) {
     const pd = camPosDir();
     send({ c: "throw", dir: pd.dir });
+  } else if (hoveredCloud) {
+    openKpModal(hoveredCloud.ids);       // 点击确认: 打开知识点浮窗
   }
 });
 
@@ -1325,6 +1385,15 @@ function updateAnimations(delta, elapsed) {
     }
     sparkleSys.pts.geometry.attributes.position.needsUpdate = true;
   }
+
+  // 知识云: 轻轻浮动 + 悬停放大
+  kpClouds.forEach((c) => {
+    c.sprite.position.y = c.baseY + Math.sin(elapsed * 1.3 + c.phase) * 0.05;
+    const target = (hoveredCloud === c.sprite.userData.kpCloud) ? 1.28 : 1.0;
+    const cur2 = c.sprite.scale.x / 1.05;
+    const k2 = cur2 + (target - cur2) * Math.min(delta * 10, 1);
+    c.sprite.scale.set(1.05 * k2, 0.53 * k2, 1);
+  });
 
   // 冷风机持续送风(仅化霜停); 冷凝器顶部风机跟随压缩机
   const evapRunning = latestTh ? latestTh.comp !== "defrost" : true;
@@ -1452,5 +1521,6 @@ addDoorMist();
 addEquipment();
 addSafetyDetails();
 addRealismDetails();
+addKnowledgeClouds();
 connect();
 animate();

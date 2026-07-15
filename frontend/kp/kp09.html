@@ -4,112 +4,171 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="../vendor/katex/katex.min.css" />
   <link rel="stylesheet" href="./kp.css" />
+  <script defer src="../vendor/katex/katex.min.js"></script>
   <style>
-    .race-row { display: flex; gap: 14px; }
+    .race-row { display: flex; gap: 16px; }
     .race-row .sec { flex: 0 0 300px; }
     .race-row .chart { flex: 1 1 auto; min-width: 0; }
     .race-row canvas, .race-row svg { width: 100%; display: block; border-radius: 8px; }
-    .geo-btns button { flex: 1; }
+    .race-row canvas { border: 1px solid var(--line); }
+    .col-title { font-size: 15px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
     @media (max-width: 860px) { .race-row { flex-direction: column; } .race-row .sec { flex: 1 1 auto; } }
   </style>
 </head>
 <body data-kp="KP09">
   <div class="kp-wrap" id="wrap">
 
-    <div class="panel viz-box">
-      <h3>降温赛跑:表面 vs 中心 <small>同一起跑线出发,表面一骑绝尘,中心气喘吁吁最后撞线</small></h3>
-      <div class="race-row">
-        <div class="sec">
-          <div class="hintline" style="margin:0 0 6px"><b>剖面温度场</b> · 中心是永远的"最热核"</div>
-          <canvas id="secCanvas" width="300" height="330"></canvas>
-        </div>
-        <div class="chart">
-          <div class="hintline" style="margin:0 0 6px"><b>温度—时间图</b> · 达标线看中心,不看表面</div>
-          <svg id="raceSvg" viewBox="0 0 640 330" preserveAspectRatio="xMidYMid meet"></svg>
-        </div>
-      </div>
-      <div class="ctl-row" style="margin-top:12px">
-        <button class="kbtn hot" id="playBtn">▶ 播放</button>
-        <button class="kbtn" id="resetBtn">↺ 重置</button>
-        <button class="kbtn" data-spd="1">×1</button>
-        <button class="kbtn on" data-spd="2">×2</button>
-        <button class="kbtn" data-spd="4">×4</button>
-        <input type="range" id="foScrub" min="0.002" max="1.5" step="0.002" value="0.002" style="flex:2" />
-        <output id="foOut" style="flex:0 0 150px"></output>
-      </div>
-      <div class="hintline">💡 <b>核心体验</b>:按播放,看两条线逐渐分离——Bi 越大中心掉队越狠;拖动进度条,左侧剖面与右侧曲线严格同步。厚度翻倍,时间×4(t ∝ L²)。</div>
-    </div>
-
-    <div class="kp-grid main-side">
+    <!-- ═══════════ 第 1 节 ═══════════ -->
+    <section class="slide" data-title="定位与图景">
       <div class="panel">
-        <h3>工况与几何</h3>
-        <div class="ctl-row geo-btns">
-          <label>几何形状</label>
-          <button class="kbtn on" data-geo="slab">平板</button>
-          <button class="kbtn" data-geo="cyl">圆柱</button>
-          <button class="kbtn" data-geo="sph">球</button>
-        </div>
-        <div class="ctl-row">
-          <label>表面 h</label>
-          <input type="range" id="h" min="5" max="60" step="0.5" value="25" />
-          <output id="hOut"></output>
-        </div>
-        <div class="ctl-row">
-          <label>特征尺寸 L<sub>c</sub></label>
-          <input type="range" id="lc" min="0.01" max="0.15" step="0.005" value="0.05" class="mono-track" />
-          <output id="lcOut"></output>
-        </div>
-        <div class="ctl-row">
-          <label>货物 λ</label>
-          <input type="range" id="lam" min="0.3" max="2" step="0.05" value="0.5" class="mono-track" />
-          <output id="lamOut"></output>
-        </div>
-        <div class="ctl-row">
-          <label>达标温度(中心)</label>
-          <input type="range" id="ttgt" min="-20" max="10" step="1" value="0" />
-          <output id="ttgtOut"></output>
-        </div>
-        <div class="cards" style="margin-top:12px">
-          <div class="card"><div class="lbl">Bi = h·L<sub>c</sub>/λ</div><div class="val" id="vBi">--</div></div>
-          <div class="card"><div class="lbl">当前 Fo / 真实时间</div><div class="val" id="vFo" style="font-size:16px">--</div></div>
-          <div class="card hot"><div class="lbl">表面温度</div><div class="val" id="vTs">--<small>℃</small></div></div>
-          <div class="card hot"><div class="lbl">中心温度</div><div class="val" id="vTc">--<small>℃</small></div></div>
-          <div class="card ok"><div class="lbl">中心达标时间</div><div class="val" id="vTgt">--<small>h</small></div></div>
-        </div>
-        <div id="lumpTip" class="hintline" style="display:none">
-          ⚠ Bi &lt; 0.1:中心几乎不滞后,可直接用 <a href="./kp10.html" style="color:#7fdcff">KP10 集中参数法</a>。
-        </div>
-        <div class="formula cold-side">θ*<sub>c</sub> = C₁·e<sup>−ζ₁²·Fo</sup>(Fo&gt;0.2 一项近似,早期切 KP03 的 erf 解)</div>
-        <div class="formula">t = Fo·L<sub>c</sub>²/α —— 尺寸翻倍,时间×4</div>
+        <p class="lead">KP08 用 Bi 判断了瓶颈在哪。当 <b>Bi &gt; 0.1</b>(内部导热不可忽略)时,货物内部温度<b>不再均匀、
+          且随时间不断变化</b>——这就是<b>非稳态导热</b>。它是"货物降温"链条的心脏,回答工程上最关心的问题:
+          <b>这批货物中心要多久才能降到目标温度?</b>冻结时间、冷却间停留时间、码放厚度,全由它决定。</p>
+        <h3>物理图景</h3>
+        <ul class="points">
+          <li>20℃ 的货物突然进 −18℃ 冷风:表面<b>立刻</b>降温,但热量从中心"走"到表面需要时间——
+            形成<b>由表及里、逐层滞后</b>的温度波。</li>
+          <li><b>早期</b>:只有表层被"惊动",中心还蒙在鼓里(正是 KP03 半无限大的早期行为)。</li>
+          <li><b>中后期</b>:扰动传到中心,整块进入"规则冷却阶段",各点按同一指数节奏一起下降,
+            <b>中心始终最热、最后一个达标</b>。</li>
+          <li>温度分布像一条不断下沉、中间鼓起的曲线:表面贴近风温,中心高高凸起,凸起被逐渐压平并整体下移。</li>
+        </ul>
+        <div class="takeaway">一句话记忆:非稳态导热 = 一场由表及里的降温接力赛,中心永远最后撞线;我们要算的就是撞线时间。</div>
       </div>
+    </section>
 
+    <!-- ═══════════ 第 2 节 ═══════════ -->
+    <section class="slide" data-title="核心公式">
+      <div class="panel">
+        <h3>① 控制方程(傅里叶第二定律)</h3>
+        <div class="tex">\frac{\partial T}{\partial t} = \alpha \nabla^2 T,\qquad \alpha = \frac{\lambda}{\rho c_p}</div>
+        <p class="fnote">α:热扩散率(m²/s),衡量温度扰动传播快慢。与 KP01 稳态的根本区别:左边多了 ∂T/∂t——物体在蓄放热,不再"进=出"。</p>
+
+        <h3>② 两个决定性无量纲数:Bi 定形,Fo 定时</h3>
+        <div class="tex">Bi = \frac{h L_c}{\lambda_{goods}}\;(空间:内外热阻比),\qquad
+          Fo = \frac{\alpha\, t}{L_c^2}\;(时间:无量纲进度)</div>
+        <p class="fnote">给定 Bi,中心无量纲温度只是 Fo 的函数——Bi 管"中心滞后多严重",Fo 管"进行到哪一步"。</p>
+
+        <h3>③ 规则阶段:一项近似(Fo &gt; 0.2)</h3>
+        <div class="tex">\theta^* = \frac{T - T_\infty}{T_i - T_\infty},\qquad
+          \theta^*_{center} = C_1\,e^{-\zeta_1^2\, Fo}</div>
+        <p class="fnote">C₁、ζ₁ 只与 Bi 和几何(平板/圆柱/球)有关,查表或解超越方程得到。
+          规则阶段的降温是"指数衰减"——与 KP10 形式一致,只是 ζ₁ 里含了内部导热的影响。</p>
+
+        <h3>④ Heisler 图与冷却时间反算</h3>
+        <div class="tex">t = \frac{Fo \cdot L_c^2}{\alpha}\qquad\Longrightarrow\qquad t \propto L_c^2</div>
+        <p class="fnote">工程不解偏微分方程,查 Heisler 诺谟图(中心温度图 + 位置修正图 + Gröber 热量图)。
+          <b>尺寸翻倍,时间×4</b>——码放厚度直接决定库容周转。食品安全验收看<b>中心温度</b>(最不利点)。</p>
+      </div>
+    </section>
+
+    <!-- ═══════════ 第 3 节 ═══════════ -->
+    <section class="slide" data-title="互动实验">
       <div class="panel viz-box">
-        <h3>Heisler 查图 <small>中心温度诺谟图:工作点沿 1/Bi 曲线滑动</small></h3>
-        <svg id="heislerSvg" viewBox="0 0 640 380" preserveAspectRatio="xMidYMid meet"></svg>
+        <h3>降温赛跑:表面 vs 中心 <small>同一起跑线出发,表面一骑绝尘,中心最后撞线</small></h3>
+        <div class="race-row">
+          <div class="sec">
+            <div class="col-title">剖面温度场 · 中心是"最热核"</div>
+            <canvas id="secCanvas" width="300" height="330"></canvas>
+          </div>
+          <div class="chart">
+            <div class="col-title">温度—时间图 · 达标线看中心,不看表面</div>
+            <svg id="raceSvg" viewBox="0 0 640 330" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
+        </div>
+        <div class="ctl-row" style="margin-top:12px">
+          <button class="kbtn hot" id="playBtn">▶ 播放</button>
+          <button class="kbtn" id="resetBtn">↺ 重置</button>
+          <button class="kbtn" data-spd="1">×1</button>
+          <button class="kbtn on" data-spd="2">×2</button>
+          <button class="kbtn" data-spd="4">×4</button>
+          <input type="range" id="foScrub" min="0.002" max="1.5" step="0.002" value="0.002" style="flex:2" />
+          <output id="foOut" style="flex:0 0 170px"></output>
+        </div>
+        <div class="hintline">💡 按播放看两条线逐渐分离——Bi 越大中心掉队越狠;拖进度条,左右两图严格同步。把厚度翻倍,时间×4。</div>
       </div>
-    </div>
+      <div class="kp-grid main-side">
+        <div class="panel">
+          <h3>工况与几何</h3>
+          <div class="ctl-row"><label>几何形状</label>
+            <button class="kbtn on" data-geo="slab">平板</button>
+            <button class="kbtn" data-geo="cyl">圆柱</button>
+            <button class="kbtn" data-geo="sph">球</button></div>
+          <div class="ctl-row"><label>表面 h</label>
+            <input type="range" id="h" min="5" max="60" step="0.5" value="25" /><output id="hOut"></output></div>
+          <div class="ctl-row"><label>特征尺寸 L_c</label>
+            <input type="range" id="lc" min="0.01" max="0.15" step="0.005" value="0.05" class="mono-track" /><output id="lcOut"></output></div>
+          <div class="ctl-row"><label>货物 λ</label>
+            <input type="range" id="lam" min="0.3" max="2" step="0.05" value="0.5" class="mono-track" /><output id="lamOut"></output></div>
+          <div class="ctl-row"><label>达标温度(中心)</label>
+            <input type="range" id="ttgt" min="-20" max="10" step="1" value="0" /><output id="ttgtOut"></output></div>
+          <div class="cards" style="margin-top:10px">
+            <div class="card"><div class="lbl">Bi</div><div class="val" id="vBi">--</div></div>
+            <div class="card"><div class="lbl">当前 Fo / 真实时间</div><div class="val" id="vFo" style="font-size:18px">--</div></div>
+            <div class="card hot"><div class="lbl">表面温度</div><div class="val" id="vTs">--<small>℃</small></div></div>
+            <div class="card hot"><div class="lbl">中心温度</div><div class="val" id="vTc">--<small>℃</small></div></div>
+            <div class="card ok"><div class="lbl">中心达标时间</div><div class="val" id="vTgt">--<small>h</small></div></div>
+          </div>
+          <div id="lumpTip" class="hintline" style="display:none">
+            ⚠ Bi &lt; 0.1:中心几乎不滞后,可直接用 <a href="./kp10.html" style="color:var(--cold)">KP10 集中参数法</a>。
+          </div>
+        </div>
+        <div class="panel viz-box">
+          <h3>Heisler 查图 <small>工作点沿 1/Bi 曲线滑动——把查图法和动画对应起来</small></h3>
+          <svg id="heislerSvg" viewBox="0 0 640 390" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+      </div>
+    </section>
 
-    <details class="knowledge">
-      <summary>知识速览 —— 非稳态导热(中心滞后)</summary>
-      <div class="kbody">
-        <h4>物理图景</h4>
-        <p>温度扰动由表及里逐层渗透:表面最先响应,中心永远最后达标。控制方程 ∂T/∂t = α∇²T,
-          热扩散率 α=λ/(ρc) 决定"冷得多快"。两个无量纲数各管一头:<b>Bi 定形</b>(中心滞后多严重),<b>Fo 定时</b>(进度条走到哪)。</p>
-        <h4>核心公式</h4>
-        <p>Fo&gt;0.2 后级数解只剩第一项:θ*<sub>c</sub> = C₁e<sup>−ζ₁²Fo</sup>,C₁、ζ₁ 只依赖 Bi 与几何(平板/圆柱/球),
-          工程上直接查 Heisler 图;位置修正:平板 cos(ζ₁x*)、圆柱 J₀(ζ₁r*)、球 sin(ζ₁r*)/(ζ₁r*)。</p>
-        <h4>典型数值(本页默认参数即此例)</h4>
-        <p>厚 0.1m 瘦肉平板(L<sub>c</sub>=0.05),T<sub>i</sub>=20℃、风温 −25℃、h=25:α≈1.36×10⁻⁷,Bi=<b>2.5</b>,
-          θ*目标=0.556,查得 Fo≈<b>0.60</b> → t≈1.1×10⁴s ≈ <b>3.1 小时</b>;厚度翻倍则 12 小时(t∝L²)。</p>
-        <h4>常见误区</h4>
-        <p class="trap">用表面温度验收——表面早就达标,食品安全永远测中心(最不利点)。</p>
-        <p class="trap">降温时间 ∝ 厚度?——是平方关系,厚度是最敏感因素。</p>
-        <p class="trap">任何时候都用一项近似?——要求 Fo&gt;0.2,极早期按 KP03 半无限大处理。</p>
-        <h4>与其他知识点</h4>
-        <p>从 KP08 的 Bi&gt;0.1 分流而来;Bi&lt;0.1 退化为 KP10;极早期是 KP03;h 来自 KP04/KP06;放热量进热负荷总账。</p>
+    <!-- ═══════════ 第 4 节 ═══════════ -->
+    <section class="slide" data-title="典型例题">
+      <div class="panel example">
+        <h3>例题:这块肉的中心,多久降到 0℃?</h3>
+        <p class="lead" style="font-size:19px">厚 2L=0.1m 的瘦肉平板(半厚 L<span class="ti">_c</span>=0.05m),初温 T<span class="ti">_i</span>=20℃,
+          置于 T<span class="ti">_\infty</span>=−25℃ 冷风中,h=25 W/(m²·K)。肉:λ=0.5 W/(m·K)、ρ=1050 kg/m³、c=3500 J/(kg·K)。
+          求中心降到 0℃ 所需时间。<b>(实验节默认参数即本题)</b></p>
+        <div class="step"><span class="n">1</span><div>热扩散率:
+          <div class="tex">\alpha = \frac{\lambda}{\rho c} = \frac{0.5}{1050\times3500} \approx 1.36\times10^{-7}\;\mathrm{m^2/s}</div></div></div>
+        <div class="step"><span class="n">2</span><div>毕渥数:
+          <div class="tex">Bi = \frac{hL_c}{\lambda} = \frac{25\times0.05}{0.5} = 2.5 \;(&gt;0.1,必须用非稳态)</div></div></div>
+        <div class="step"><span class="n">3</span><div>目标无量纲中心温度:
+          <div class="tex">\theta^*_{center} = \frac{0-(-25)}{20-(-25)} = \frac{25}{45} \approx 0.556</div></div></div>
+        <div class="step"><span class="n">4</span><div>由 Bi=2.5 查平板一项近似系数(C₁≈1.21,ζ₁≈1.14),解出 Fo:
+          <div class="tex">0.556 = 1.21\,e^{-1.14^2\,Fo} \;\Rightarrow\; Fo = \frac{\ln(1.21/0.556)}{1.30} \approx 0.60</div></div></div>
+        <div class="step"><span class="n">5</span><div>反算真实时间:
+          <div class="tex">t = \frac{Fo\cdot L_c^2}{\alpha} = \frac{0.60\times0.05^2}{1.36\times10^{-7}}
+            \approx 1.1\times10^4\;\mathrm{s} \approx 3.1\;\mathrm{h}</div></div></div>
+        <div class="answer">✅ 中心降到 0℃ 约需 <b>3 小时</b>;若厚度翻倍(L<span class="ti">_c</span>=0.1),时间变 4 倍到 12h——
+          t ∝ L² 的直观体现。</div>
       </div>
-    </details>
+    </section>
+
+    <!-- ═══════════ 第 5 节 ═══════════ -->
+    <section class="slide" data-title="误区与小结">
+      <div class="panel">
+        <h3>常见误区</h3>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">用表面温度当验收温度?</span> →
+          <span class="right">✔</span> 表面早就达标,中心还差得远——验收永远看<b>中心</b>(最不利点)。</div></div>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">降温时间与厚度成正比?</span> →
+          <span class="right">✔</span> 是<b>平方关系</b>(t ∝ L²),厚度是最敏感因素。</div></div>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">Bi 和 Fo 混为一谈?</span> →
+          <span class="right">✔</span> Bi 是空间上的热阻比(定形),Fo 是无量纲时间(定时)。</div></div>
+        <div class="trap-card"><span class="x">❌</span><div><span class="wrong">任何时候都能用一项近似?</span> →
+          <span class="right">✔</span> 要求 <b>Fo&gt;0.2</b>;很早期须按 KP03 半无限大处理。</div></div>
+        <h3 style="margin-top:20px">与其他知识点的联系</h3>
+        <p>从 KP08 的 Bi&gt;0.1 分流而来(表面能量平衡就是本页边界条件);Bi&lt;0.1 退化为 KP10 集中参数——
+          两者是同一物理的两个极端;极早期是 KP03 的 erf 解;h 来自 KP04/KP06;Gröber 图的放热量进冷负荷总账。
+          含水货物冻结后 λ、α 增大,解释了冻结曲线的"平台+折点"。</p>
+        <div class="link-row">
+          <a href="./kp08.html">KP08 Bi 判据</a><a href="./kp10.html">KP10 集中参数</a>
+          <a href="./kp03.html">KP03 半无限大</a><a href="./kp06.html">KP06 强制对流</a>
+        </div>
+        <div class="takeaway">要点小结:∂T/∂t = α∇²T;Bi 定形、Fo 定时;规则阶段 θ*c = C₁e^(−ζ₁²Fo);
+          t = Fo·L²/α → 尺寸翻倍时间×4;验收测中心。</div>
+      </div>
+    </section>
   </div>
 
   <script type="module">
@@ -119,7 +178,6 @@
     const state = { geo: "slab", h: 25, Lc: 0.05, lam: 0.5, Ti: 20, Tinf: -25, Ttgt: 0, Fo: 0.002, playing: false, speed: 2 };
     const RHO_C = 1050 * 3500;
 
-    // ---------------- 贝塞尔 J0/J1 (|x|<3, A&S 9.4.1/9.4.4) ----------------
     function besselJ0(x) {
       const t = (x / 3) ** 2;
       return 1 + t * (-2.2499997 + t * (1.2656208 + t * (-0.3163866 + t * (0.0444479 + t * (-0.0039444 + t * 0.00021)))));
@@ -129,7 +187,6 @@
       return x * (0.5 + t * (-0.56249985 + t * (0.21093573 + t * (-0.03954289 + t * (0.00443319 + t * (-0.00031761 + t * 0.00001109))))));
     }
 
-    // ---------------- 一项近似系数 (查 Bi 解超越方程) ----------------
     function oneTerm(geo, Bi) {
       let z1, C1;
       if (geo === "slab") {
@@ -146,27 +203,23 @@
       return { z1, C1 };
     }
 
-    function posFactor(geo, z1, xs) {          // 位置修正 θ(x*)/θc
+    function posFactor(geo, z1, xs) {
       if (geo === "slab") return Math.cos(z1 * xs);
       if (geo === "cyl") return besselJ0(z1 * xs);
       const a = z1 * xs;
       return a < 1e-6 ? 1 : Math.sin(a) / a;
     }
 
-    // exp(a²)·erfc(a), 大 a 用渐近式防溢出
     function expErfc(a) {
       if (a > 4) return (1 / (a * Math.sqrt(Math.PI))) * (1 - 0.5 / (a * a));
       return Math.exp(a * a) * erfc(a);
     }
 
-    // 半无限大 + 第三类边界 (早期精确): θ* = 1 - [erfc(η) - exp(...)erfc(η+aβ)]
     function thetaEarly(xs, Fo, Bi) {
-      const s = 1 - xs;                        // 距表面的无量纲深度
+      const s = 1 - xs;
       if (Fo < 1e-8) return 1;
       const eta = s / (2 * Math.sqrt(Fo));
       const b = Bi * Math.sqrt(Fo);
-      // (T−Ti)/(T∞−Ti) = erfc(η) − exp(Bi·s + Bi²Fo)·erfc(η+b)
-      // 恒等式: Bi·s + Bi²Fo = 2ηb + b² → exp(k)·erfc(η+b) = exp(−η²)·[exp((η+b)²)erfc(η+b)], 不溢出
       const drop = erfc(eta) - Math.exp(-eta * eta) * expErfc(eta + b);
       return clamp(1 - drop, 0, 1);
     }
@@ -197,32 +250,31 @@
     function drawSection(r) {
       const W = sec.width, H = sec.height;
       sctx.clearRect(0, 0, W, H);
-      sctx.fillStyle = "rgba(12,20,34,0.92)";
+      sctx.fillStyle = "#eef4fa";
       sctx.fillRect(0, 0, W, H);
       const thC = theta(0, state.Fo, r.ot, r.Bi);
       if (state.geo === "slab") {
-        // 竖板: x* 从左表面(-1)到右表面(1)
-        const x0 = 55, w = W - 110, y0 = 40, hh = H - 96;
+        const x0 = 58, w = W - 116, y0 = 42, hh = H - 100;
         for (let px = 0; px < w; px++) {
           const xs = Math.abs((px / w) * 2 - 1);
           sctx.fillStyle = tempColor(T(theta(xs, state.Fo, r.ot, r.Bi)), state.Tinf, state.Ti);
           sctx.fillRect(x0 + px, y0, 1.5, hh);
         }
-        sctx.strokeStyle = "#dceafc";
+        sctx.strokeStyle = "#52667c";
         sctx.strokeRect(x0, y0, w, hh);
-        sctx.fillStyle = "#9fd4ff";
-        sctx.font = "11px Consolas";
-        sctx.fillText(`冷风 ${state.Tinf}℃`, 4, y0 + 14);
-        sctx.fillText(`冷风`, W - 44, y0 + 14);
-        // 中心核
+        sctx.fillStyle = "#0d4f8f";
+        sctx.font = "700 13px Consolas";
+        sctx.fillText(`冷风 ${state.Tinf}℃`, 2, y0 + 16);
+        sctx.fillText("冷风", W - 48, y0 + 16);
         sctx.beginPath();
-        sctx.arc(x0 + w / 2, y0 + hh / 2, 9, 0, 7);
+        sctx.arc(x0 + w / 2, y0 + hh / 2, 10, 0, 7);
         sctx.fillStyle = tempColor(T(thC), state.Tinf, state.Ti);
         sctx.fill();
-        sctx.strokeStyle = "#fff";
+        sctx.strokeStyle = "#17293d";
+        sctx.lineWidth = 2;
         sctx.stroke();
+        sctx.lineWidth = 1;
       } else {
-        // 圆柱/球: 同心环
         const cx = W / 2, cy = (H - 40) / 2 + 26, R = Math.min(cx, (H - 56) / 2) - 16;
         for (let i = 40; i >= 1; i--) {
           const xs = i / 40;
@@ -231,21 +283,23 @@
           sctx.arc(cx, cy, R * xs, 0, 7);
           sctx.fill();
         }
-        sctx.strokeStyle = "#dceafc";
+        sctx.strokeStyle = "#52667c";
         sctx.beginPath(); sctx.arc(cx, cy, R, 0, 7); sctx.stroke();
         sctx.beginPath();
-        sctx.arc(cx, cy, 8, 0, 7);
+        sctx.arc(cx, cy, 9, 0, 7);
         sctx.fillStyle = tempColor(T(thC), state.Tinf, state.Ti);
         sctx.fill();
-        sctx.strokeStyle = "#fff";
+        sctx.strokeStyle = "#17293d";
+        sctx.lineWidth = 2;
         sctx.stroke();
-        sctx.fillStyle = "#9fd4ff";
-        sctx.font = "11px Consolas";
-        sctx.fillText(`冷风 ${state.Tinf}℃ 四面八方`, 10, 20);
+        sctx.lineWidth = 1;
+        sctx.fillStyle = "#0d4f8f";
+        sctx.font = "700 13px Consolas";
+        sctx.fillText(`冷风 ${state.Tinf}℃ 四面八方`, 10, 22);
       }
-      sctx.fillStyle = "#ffe6cd";
-      sctx.font = "13px Consolas";
-      sctx.fillText(`中心 ${fmt(T(thC), 1)}℃`, W / 2 - 44, H - 12);
+      sctx.fillStyle = "#17293d";
+      sctx.font = "700 15px Consolas";
+      sctx.fillText(`中心 ${fmt(T(thC), 1)}℃`, W / 2 - 52, H - 12);
     }
 
     // ---------------- 赛跑图 ----------------
@@ -253,60 +307,57 @@
     const FO_MAX = 1.5;
     function drawRace(r) {
       race.innerHTML = "";
-      const X = scale([0, FO_MAX], [58, 620]);
-      const Y = scale([state.Tinf - 2, state.Ti + 2], [292, 20]);
-      svgEl("line", { x1: 58, y1: 292, x2: 620, y2: 292, stroke: "#39516d" }, race);
-      svgEl("line", { x1: 58, y1: 292, x2: 58, y2: 16, stroke: "#39516d" }, race);
+      const X = scale([0, FO_MAX], [62, 620]);
+      const Y = scale([state.Tinf - 2, state.Ti + 2], [286, 22]);
+      svgEl("line", { x1: 62, y1: 286, x2: 620, y2: 286, stroke: "#8aa0b8", "stroke-width": 1.5 }, race);
+      svgEl("line", { x1: 62, y1: 286, x2: 62, y2: 18, stroke: "#8aa0b8", "stroke-width": 1.5 }, race);
       [0, 0.3, 0.6, 0.9, 1.2, 1.5].forEach((f) => {
         const hrs = f * state.Lc ** 2 / r.alpha / 3600;
-        svgEl("text", { x: X(f), y: 308, "text-anchor": "middle", class: "svg-note", text: `Fo=${f}` }, race);
-        svgEl("text", { x: X(f), y: 322, "text-anchor": "middle", class: "svg-note", fill: "#5c7594", text: `${fmt(hrs, 1)}h` }, race);
+        svgEl("text", { x: X(f), y: 304, "text-anchor": "middle", class: "svg-note", text: `Fo=${f}` }, race);
+        svgEl("text", { x: X(f), y: 320, "text-anchor": "middle", class: "svg-note", fill: "#7d8fa3", text: `${fmt(hrs, 1)}h` }, race);
       });
       for (let t = -20; t <= state.Ti; t += 10) {
-        svgEl("text", { x: 50, y: Y(t) + 4, "text-anchor": "end", class: "svg-note", text: t + "°" }, race);
-        svgEl("line", { x1: 56, y1: Y(t), x2: 620, y2: Y(t), stroke: "rgba(90,130,180,0.1)" }, race);
+        svgEl("text", { x: 54, y: Y(t) + 5, "text-anchor": "end", class: "svg-note", text: t + "°" }, race);
+        svgEl("line", { x1: 60, y1: Y(t), x2: 620, y2: Y(t), stroke: "rgba(70,110,160,0.12)" }, race);
       }
-      // 曲线
-      const mk = (xs, color, label, ly) => {
+      const mk = (xs, color, lbl, ly) => {
         let d = "";
         for (let f = 0.002; f <= FO_MAX; f += 0.012) {
           d += (d ? "L" : "M") + X(f) + "," + Y(T(theta(xs, f, r.ot, r.Bi)));
         }
-        svgEl("path", { d, fill: "none", stroke: color, "stroke-width": 2.6 }, race);
-        svgEl("text", { x: 480, y: ly, class: "svg-note", fill: color, text: label }, race);
+        svgEl("path", { d, fill: "none", stroke: color, "stroke-width": 3 }, race);
+        svgEl("text", { x: 470, y: ly, class: "svg-note", fill: color, "font-weight": "700", text: lbl }, race);
       };
-      mk(1, "#53c1ff", "表面 (先降,一骑绝尘)", Y(T(theta(1, 1.0, r.ot, r.Bi))) - 8);
-      mk(0, "#ff9a5c", "中心 (滞后,最后撞线)", Y(T(theta(0, 1.0, r.ot, r.Bi))) - 8);
-      // 达标线
-      svgEl("line", { x1: 58, y1: Y(state.Ttgt), x2: 620, y2: Y(state.Ttgt),
-        stroke: "rgba(52,208,106,0.55)", "stroke-width": 1.6, "stroke-dasharray": "7 5" }, race);
-      svgEl("text", { x: 64, y: Y(state.Ttgt) - 6, class: "svg-note", fill: "#7fe3a8", text: `达标线 ${state.Ttgt}℃ (验收看中心!)` }, race);
-      // 中心撞线点
+      mk(1, "#1f7fd4", "表面(先降,一骑绝尘)", Y(T(theta(1, 1.0, r.ot, r.Bi))) - 10);
+      mk(0, "#d94f16", "中心(滞后,最后撞线)", Y(T(theta(0, 1.0, r.ot, r.Bi))) - 10);
+      svgEl("line", { x1: 62, y1: Y(state.Ttgt), x2: 620, y2: Y(state.Ttgt),
+        stroke: "#178a48", "stroke-width": 2, "stroke-dasharray": "8 5" }, race);
+      svgEl("text", { x: 68, y: Y(state.Ttgt) - 8, class: "svg-note", fill: "#0f6b36", "font-weight": "700",
+        text: `达标线 ${state.Ttgt}℃(验收看中心!)` }, race);
       if (r.FoTgt > 0 && r.FoTgt < FO_MAX) {
-        svgEl("circle", { cx: X(r.FoTgt), cy: Y(state.Ttgt), r: 7, fill: "none", stroke: "#34d06a", "stroke-width": 2.4 }, race);
-        svgEl("text", { x: X(r.FoTgt) + 10, y: Y(state.Ttgt) + 18, class: "svg-note", fill: "#7fe3a8",
-          text: `中心达标 Fo=${fmt(r.FoTgt, 2)} → ${fmt(r.tTgt / 3600, 1)}h` }, race);
+        svgEl("circle", { cx: X(r.FoTgt), cy: Y(state.Ttgt), r: 8, fill: "none", stroke: "#178a48", "stroke-width": 3 }, race);
+        svgEl("text", { x: clamp(X(r.FoTgt) + 12, 80, 430), y: Y(state.Ttgt) + 22, class: "svg-note",
+          fill: "#0f6b36", "font-weight": "700", text: `中心达标 Fo=${fmt(r.FoTgt, 2)} → ${fmt(r.tTgt / 3600, 1)}h` }, race);
       }
-      // 播放头
-      svgEl("line", { x1: X(state.Fo), y1: 292, x2: X(state.Fo), y2: 18, stroke: "#ffe6cd", "stroke-width": 1.6 }, race);
+      svgEl("line", { x1: X(state.Fo), y1: 286, x2: X(state.Fo), y2: 20, stroke: "#7d5a3c", "stroke-width": 2 }, race);
       const thS = theta(1, state.Fo, r.ot, r.Bi), thC = theta(0, state.Fo, r.ot, r.Bi);
-      svgEl("circle", { cx: X(state.Fo), cy: Y(T(thS)), r: 5, fill: "#53c1ff", stroke: "#fff", "stroke-width": 1.4 }, race);
-      svgEl("circle", { cx: X(state.Fo), cy: Y(T(thC)), r: 5, fill: "#ff9a5c", stroke: "#fff", "stroke-width": 1.4 }, race);
+      svgEl("circle", { cx: X(state.Fo), cy: Y(T(thS)), r: 6, fill: "#1f7fd4", stroke: "#fff", "stroke-width": 2 }, race);
+      svgEl("circle", { cx: X(state.Fo), cy: Y(T(thC)), r: 6, fill: "#d94f16", stroke: "#fff", "stroke-width": 2 }, race);
     }
 
     // ---------------- Heisler 图 ----------------
     const hei = $("#heislerSvg");
     function drawHeisler(r) {
       hei.innerHTML = "";
-      const X = scale([0, 1.5], [64, 610]);
-      const Y = scale([-2, 0], [340, 30]);          // log10 θc*
-      svgEl("line", { x1: 64, y1: 340, x2: 610, y2: 340, stroke: "#39516d" }, hei);
-      svgEl("line", { x1: 64, y1: 340, x2: 64, y2: 26, stroke: "#39516d" }, hei);
-      [0, 0.3, 0.6, 0.9, 1.2, 1.5].forEach((f) => svgEl("text", { x: X(f), y: 358, "text-anchor": "middle", class: "svg-note", text: f }, hei));
+      const X = scale([0, 1.5], [70, 610]);
+      const Y = scale([-2, 0], [340, 32]);
+      svgEl("line", { x1: 70, y1: 340, x2: 610, y2: 340, stroke: "#8aa0b8", "stroke-width": 1.5 }, hei);
+      svgEl("line", { x1: 70, y1: 340, x2: 70, y2: 28, stroke: "#8aa0b8", "stroke-width": 1.5 }, hei);
+      [0, 0.3, 0.6, 0.9, 1.2, 1.5].forEach((f) => svgEl("text", { x: X(f), y: 360, "text-anchor": "middle", class: "svg-note", text: f }, hei));
       [[0, "1"], [-1, "0.1"], [-2, "0.01"]].forEach(([e, t]) =>
-        svgEl("text", { x: 44, y: Y(e) + 4, class: "svg-note", text: t }, hei));
-      svgEl("text", { x: 70, y: 20, class: "svg-note", text: "θ*c 中心无量纲温度 (log)" }, hei);
-      svgEl("text", { x: 580, y: 374, class: "svg-note", text: "Fo" }, hei);
+        svgEl("text", { x: 48, y: Y(e) + 5, class: "svg-note", text: t }, hei));
+      svgEl("text", { x: 76, y: 22, class: "svg-note", "font-size": "15", text: "θ*c 中心无量纲温度(log)" }, hei);
+      svgEl("text", { x: 580, y: 380, class: "svg-note", "font-size": "15", text: "Fo" }, hei);
       const bis = [0.1, 0.5, 1, 2.5, 10];
       bis.forEach((bi) => {
         const o = oneTerm(state.geo, bi);
@@ -315,29 +366,24 @@
           const th = clamp(o.C1 * Math.exp(-o.z1 * o.z1 * f), 1e-3, 1);
           d += (d ? "L" : "M") + X(f) + "," + Y(Math.log10(th));
         }
-        const isCur = Math.abs(bi - r.Bi) / bi < 0.12;
-        svgEl("path", { d, fill: "none", stroke: isCur ? "#ffd166" : "rgba(120,170,230,0.55)",
-          "stroke-width": isCur ? 2.6 : 1.4 }, hei);
+        svgEl("path", { d, fill: "none", stroke: "#a8bdd2", "stroke-width": 1.6 }, hei);
         const thEnd = clamp(o.C1 * Math.exp(-o.z1 * o.z1 * 1.15), 1e-3, 1);
-        svgEl("text", { x: X(1.16), y: Y(Math.log10(thEnd)) - 4, class: "svg-note",
-          fill: "rgba(160,200,240,0.8)", text: `1/Bi=${fmt(1 / bi, 1)}` }, hei);
+        svgEl("text", { x: X(1.16), y: Y(Math.log10(thEnd)) - 5, class: "svg-note", fill: "#7d8fa3",
+          text: `1/Bi=${fmt(1 / bi, 1)}` }, hei);
       });
-      // 当前 Bi 曲线 + 工作点
       let d = "";
       for (let f = 0.05; f <= 1.5; f += 0.02) {
         const th = clamp(r.ot.C1 * Math.exp(-r.ot.z1 * r.ot.z1 * f), 1e-3, 1);
         d += (d ? "L" : "M") + X(f) + "," + Y(Math.log10(th));
       }
-      svgEl("path", { d, fill: "none", stroke: "#ff9a5c", "stroke-width": 2.6 }, hei);
+      svgEl("path", { d, fill: "none", stroke: "#d94f16", "stroke-width": 3 }, hei);
       const thNow = clamp(r.ot.C1 * Math.exp(-r.ot.z1 * r.ot.z1 * Math.max(state.Fo, 0.05)), 1e-3, 1);
-      svgEl("circle", { cx: X(Math.max(state.Fo, 0.05)), cy: Y(Math.log10(thNow)), r: 7,
-        fill: "#ffe6cd", stroke: "#e0561f", "stroke-width": 2,
-        filter: "drop-shadow(0 0 6px rgba(255,150,80,0.8))" }, hei);
-      svgEl("text", { x: 340, y: 374, "text-anchor": "middle", class: "svg-note",
-        text: `当前 Bi=${fmt(r.Bi, 2)} 曲线(橙) · 工作点随播放沿曲线滑动` }, hei);
+      svgEl("circle", { cx: X(Math.max(state.Fo, 0.05)), cy: Y(Math.log10(thNow)), r: 7.5,
+        fill: "#fff", stroke: "#d94f16", "stroke-width": 3 }, hei);
+      svgEl("text", { x: 340, y: 380, "text-anchor": "middle", class: "svg-note",
+        text: `当前 Bi=${fmt(r.Bi, 2)} 曲线(橙),工作点随播放沿曲线滑动` }, hei);
     }
 
-    // ---------------- 读数与刷新 ----------------
     function renderMetrics(r) {
       const tNow = state.Fo * state.Lc ** 2 / r.alpha / 3600;
       $("#vBi").textContent = fmt(r.Bi, 2);
@@ -352,10 +398,7 @@
     let cache = compute();
     function fullUpdate() {
       cache = compute();
-      drawSection(cache);
-      drawRace(cache);
-      drawHeisler(cache);
-      renderMetrics(cache);
+      frameUpdate();
     }
     function frameUpdate() {
       drawSection(cache);

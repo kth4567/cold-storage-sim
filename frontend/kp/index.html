@@ -7,85 +7,82 @@
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="./kp.css" />
   <style>
-    .hub-header { text-align: center; padding: 34px 0 10px; }
-    .hub-header .kp-kicker { margin-bottom: 10px; }
-    .hub-header h1 { margin: 0; font-size: 32px; letter-spacing: 3px; }
-    .hub-header p { color: var(--muted); max-width: 640px; margin: 12px auto 0; }
+    .hub-header { text-align: center; padding: 30px 0 8px; }
+    .hub-header h1 { margin: 0; font-size: 36px; letter-spacing: 3px; }
+    .hub-header p { color: var(--muted); max-width: 720px; margin: 14px auto 0; font-size: 19px; }
     .hub-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
       gap: 16px;
-      margin-top: 28px;
+      margin-top: 26px;
     }
     a.kp-card {
       display: block;
-      padding: 18px 20px 16px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: var(--panel);
+      padding: 20px 22px 18px;
+      border: 1.5px solid var(--line);
+      border-radius: 14px;
+      background: var(--paper);
       color: var(--ink);
       text-decoration: none;
       position: relative;
       overflow: hidden;
-      transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+      transition: all 0.18s;
+      box-shadow: 0 2px 10px rgba(23, 41, 61, 0.05);
     }
     a.kp-card:hover {
-      border-color: var(--line-strong);
+      border-color: var(--cold);
       transform: translateY(-3px);
-      box-shadow: 0 22px 44px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 12px 28px rgba(22, 104, 184, 0.14);
     }
     a.kp-card .bignum {
       position: absolute;
-      right: 6px;
-      top: -14px;
+      right: 10px;
+      top: -12px;
       font-family: var(--mono);
-      font-size: 88px;
+      font-size: 92px;
       font-weight: 700;
-      color: transparent;
-      -webkit-text-stroke: 1px rgba(110, 175, 245, 0.22);
+      color: rgba(22, 104, 184, 0.08);
       pointer-events: none;
       user-select: none;
     }
-    a.kp-card:hover .bignum { -webkit-text-stroke-color: rgba(255, 150, 80, 0.4); }
-    a.kp-card h2 { margin: 0 0 4px; font-size: 17.5px; }
-    a.kp-card .part { font-size: 12px; color: var(--cold); font-family: var(--mono); }
-    a.kp-card .brief { margin-top: 9px; font-size: 12.8px; color: #b7cbe2; line-height: 1.6; }
-    a.kp-card .f { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: #ffce9f; }
-    .thread { margin-top: 14px; }
+    a.kp-card:hover .bignum { color: rgba(217, 79, 22, 0.12); }
+    a.kp-card h2 { margin: 0 0 4px; font-size: 21px; }
+    a.kp-card .part { font-size: 14.5px; color: var(--cold); font-weight: 700; }
+    a.kp-card .brief { margin-top: 8px; font-size: 15.5px; color: var(--muted); line-height: 1.7; }
+    a.kp-card .f { margin-top: 10px; font-family: var(--mono); font-size: 14px; color: #a34410; }
+    .thread { margin-top: 16px; }
     .thread .chain {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 8px;
       align-items: center;
-      font-family: var(--mono);
-      font-size: 12.5px;
+      font-size: 15.5px;
     }
     .thread .chain a {
-      padding: 4px 10px;
-      border: 1px solid var(--line-strong);
+      padding: 6px 14px;
+      border: 1.5px solid var(--line-strong);
       border-radius: 999px;
-      color: #d6eaff;
+      color: var(--cold);
+      font-weight: 600;
       text-decoration: none;
-      background: rgba(20, 42, 72, 0.5);
+      background: var(--paper);
     }
-    .thread .chain a:hover { background: rgba(35, 78, 130, 0.7); }
-    .thread .chain .arrow { color: var(--hot); }
-    .thread p { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+    .thread .chain a:hover { background: var(--cold-soft); border-color: var(--cold); }
+    .thread .chain .arrow { color: var(--hot); font-weight: 700; }
+    .thread p { margin: 6px 0 14px; color: var(--muted); font-size: 15.5px; }
   </style>
 </head>
 <body>
   <div class="kp-wrap">
     <div class="hub-header">
-      <div class="kp-kicker">COLD STORAGE · HEAT TRANSFER ATLAS</div>
       <h1>传热学知识点总览</h1>
-      <p>冷库的每一个部位都是一堂传热课。11 个知识点,11 个互不雷同的交互记忆点——
-        从墙体里的温度折线,到货物中心的降温赛跑。</p>
-      <a class="kp-back" href="../index.html" style="display:inline-block;margin-top:14px">⟵ 回到冷库巡检</a>
+      <p>冷库的每一个部位都是一堂传热课。11 个知识点,每页五节:物理图景 → 核心公式 → 互动实验 → 典型例题 → 误区小结。</p>
+      <a class="kp-back" href="../index.html" style="display:inline-block;margin-top:16px">⟵ 回到冷库巡检</a>
     </div>
 
     <div class="hub-grid" id="grid"></div>
 
-    <div class="panel" style="margin-top:30px">
+    <div class="panel" style="margin-top:28px">
       <h3>推荐串讲线索 <small>四条主线走完全部知识点</small></h3>
       <div id="threads"></div>
     </div>
@@ -125,7 +122,8 @@
       const chain = t.ids
         .map((id) => `<a href="./${KP_BY_ID[id].file}">${id} ${KP_BY_ID[id].title}</a>`)
         .join('<span class="arrow">→</span>');
-      div.innerHTML = `<div class="chain">${chain}</div><p>${t.note}</p>`;
+      div.innerHTML = `<div style="font-weight:700;font-size:17px;margin-bottom:6px">${t.name}</div>
+        <div class="chain">${chain}</div><p>${t.note}</p>`;
       tBox.appendChild(div);
     });
   </script>
