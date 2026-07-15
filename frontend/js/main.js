@@ -17,7 +17,7 @@ scene.background = new THREE.Color(0x0a1420);
 scene.fog = new THREE.FogExp2(0x1a2836, 0.010);
 
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 160);
-camera.position.set(0, 1.7, 10.5);
+camera.position.set(0, 1.7, 13);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
@@ -116,8 +116,6 @@ const mats = {
   }),
   steel: new THREE.MeshStandardMaterial({ color: 0x8b99a4, roughness: 0.3, metalness: 0.8 }),
   darkSteel: new THREE.MeshStandardMaterial({ color: 0x2a333c, roughness: 0.42, metalness: 0.65 }),
-  blueSteel: new THREE.MeshStandardMaterial({ color: 0x0b5b9c, roughness: 0.34, metalness: 0.35 }),
-  redSteel: new THREE.MeshStandardMaterial({ color: 0xa33423, roughness: 0.36, metalness: 0.35 }),
   yellowPipe: new THREE.MeshStandardMaterial({ color: 0xc69420, roughness: 0.36, metalness: 0.35 }),
   carton: new THREE.MeshStandardMaterial({ map: cardboardT[0], roughness: 0.88, metalness: 0.0 }),
   pallet: new THREE.MeshStandardMaterial({ color: 0x85613d, roughness: 0.85, metalness: 0.0 }),
@@ -128,6 +126,10 @@ const mats = {
   }),
   doorMist: new THREE.PointsMaterial({
     color: 0xd8f2ff, size: 0.24, transparent: true, opacity: 0.0,
+    depthWrite: false, map: TEX.softParticleTexture(),
+  }),
+  airStream: new THREE.PointsMaterial({
+    color: 0xeafaff, size: 0.1, transparent: true, opacity: 0.0,
     depthWrite: false, map: TEX.softParticleTexture(),
   }),
   glassIce: new THREE.MeshStandardMaterial({
@@ -175,14 +177,14 @@ function addLighting() {
   dusk.shadow.bias = -0.0004;
   scene.add(dusk);
 
-  // 库内冷白灯管 (提高发光强度供辉光拾取)
-  [[-3.6, 3.65, 0], [0, 3.65, -5.2], [3.6, 3.65, 0]].forEach((p) => {
-    const light = new THREE.PointLight(0xe8f4ff, 25, 7.5, 2);
-    light.position.set(p[0], p[1], p[2]);
+  // 库内冷白灯管 (提高发光强度供辉光拾取, 6 组两列三排)
+  [[-3.5, 1.0], [3.5, 1.0], [-3.5, -4.5], [3.5, -4.5], [-3.5, -10.0], [3.5, -10.0]].forEach(([lx, lz]) => {
+    const light = new THREE.PointLight(0xe8f4ff, 26, 9, 2);
+    light.position.set(lx, 5.15, lz);
     scene.add(light);
     const tube = box(0.18, 0.08, 2.1, new THREE.MeshStandardMaterial({
       color: 0xeef8ff, emissive: 0xd6f0ff, emissiveIntensity: 1.7, roughness: 0.2,
-    }), new THREE.Vector3(p[0], 3.48, p[2]), false, false);
+    }), new THREE.Vector3(lx, 4.98, lz), false, false);
     tube.rotation.y = Math.PI / 2;
   });
 
@@ -196,37 +198,39 @@ function addLighting() {
   }), new THREE.Vector3(9.3, 6.5, 8.25), false, false);
   lamp.rotation.z = 0.12;
 
-  // 门口投光灯: 暖光洒在入口
-  const entrance = new THREE.PointLight(0xffe0b0, 15, 10, 2);
-  entrance.position.set(0, 4.7, 6.2);
-  scene.add(entrance);
-  box(0.5, 0.12, 0.22, new THREE.MeshStandardMaterial({
-    color: 0x2c3138, emissive: 0xffe2b0, emissiveIntensity: 1.5, roughness: 0.4,
-  }), new THREE.Vector3(0, 4.62, 5.28), false, false);
+  // 穿堂吊灯: 两盏暖光挂在穿堂顶板下
+  [6.6, 8.8].forEach((lz) => {
+    const lamp = new THREE.PointLight(0xffe0b0, 14, 8, 2);
+    lamp.position.set(0, 3.9, lz);
+    scene.add(lamp);
+    box(0.5, 0.12, 0.22, new THREE.MeshStandardMaterial({
+      color: 0x2c3138, emissive: 0xffe2b0, emissiveIntensity: 1.5, roughness: 0.4,
+    }), new THREE.Vector3(0, 4.12, lz), false, false);
+  });
 }
 
 function addGround() {
   box(38, 0.18, 34, mats.floor, new THREE.Vector3(4, -0.1, -1), false, true);
-  // 水洼 (低粗糙度 + 环境反射 = 镜面湿地)
-  const wet = box(18, 0.025, 9, mats.wet, new THREE.Vector3(8, 0.01, 7.3), false, true);
+  // 水洼 (低粗糙度 + 环境反射 = 镜面湿地, 移到穿堂东侧场地)
+  const wet = box(9, 0.025, 9, mats.wet, new THREE.Vector3(12.5, 0.01, 7.3), false, true);
   wet.rotation.y = -0.03;
 }
 
 function addColdRoom() {
-  const width = 9.5, depth = 12, height = 4.5, zc = -1;
+  const width = 14, depth = 18, height = 6, zc = -4;
   box(width, 0.18, depth, mats.wall, new THREE.Vector3(0, height, zc));
   box(0.18, height, depth, mats.wall, new THREE.Vector3(-width / 2, height / 2, zc));
   box(0.18, height, depth, mats.wall, new THREE.Vector3(width / 2, height / 2, zc));
   box(width, height, 0.18, mats.wall, new THREE.Vector3(0, height / 2, zc - depth / 2));
   // 门洞两侧 + 门楣 (门洞宽 2.6, x -1.3..1.3)
-  box(3.45, height, 0.22, mats.wall, new THREE.Vector3(-3.025, height / 2, zc + depth / 2));
-  box(3.45, height, 0.22, mats.wall, new THREE.Vector3(3.025, height / 2, zc + depth / 2));
-  box(2.7, 1.0, 0.22, mats.wall, new THREE.Vector3(0, 4.0, zc + depth / 2));
+  box(5.7, height, 0.22, mats.wall, new THREE.Vector3(-4.15, height / 2, zc + depth / 2));
+  box(5.7, height, 0.22, mats.wall, new THREE.Vector3(4.15, height / 2, zc + depth / 2));
+  box(2.7, 2.5, 0.22, mats.wall, new THREE.Vector3(0, 4.75, zc + depth / 2));
 
   box(width - 0.25, 0.06, depth - 0.25, mats.glassIce, new THREE.Vector3(0, 0.04, zc), false, true);
 
   const ribMat = new THREE.LineBasicMaterial({ color: 0xddefff, transparent: true, opacity: 0.22 });
-  for (let x = -4.1; x <= 4.1; x += 0.7) {
+  for (let x = -6.3; x <= 6.3; x += 0.7) {
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(x, 0.15, zc - depth / 2 + 0.1),
       new THREE.Vector3(x, height - 0.1, zc - depth / 2 + 0.1),
@@ -234,17 +238,32 @@ function addColdRoom() {
     scene.add(new THREE.Line(geo, ribMat));
   }
 
-  addCollider(-4.85, -4.55, -7, 5.2);
-  addCollider(4.55, 4.85, -7, 5.2);
-  addCollider(-4.8, 4.8, -7.1, -6.75);
-  addCollider(-4.8, -1.40, 4.85, 5.3);
-  addCollider(1.40, 4.8, 4.85, 5.3);
+  addCollider(-7.10, -6.80, -13, 5.2);
+  addCollider(6.80, 7.10, -13, 5.2);
+  addCollider(-7.05, 7.05, -13.1, -12.75);
+  addCollider(-7.05, -1.40, 4.85, 5.3);
+  addCollider(1.40, 7.05, 4.85, 5.3);
 
-  // 门框
+  // 门框 (通高立柱直抵屋面线)
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x5c6873, roughness: 0.36, metalness: 0.6 });
-  box(3.2, 0.22, 0.3, frameMat, new THREE.Vector3(0, 4.55, 5.05));
-  box(0.22, 4.5, 0.3, frameMat, new THREE.Vector3(-1.47, 2.25, 5.05));
-  box(0.22, 4.5, 0.3, frameMat, new THREE.Vector3(1.47, 2.25, 5.05));
+  box(3.2, 0.22, 0.3, frameMat, new THREE.Vector3(0, 6.05, 5.05));
+  box(0.22, 6.0, 0.3, frameMat, new THREE.Vector3(-1.47, 3.0, 5.05));
+  box(0.22, 6.0, 0.3, frameMat, new THREE.Vector3(1.47, 3.0, 5.05));
+}
+
+// 收发货穿堂: 库门外缓冲间 (真实冷库进出货不直通室外), 外口 3m 宽挂软帘
+function addAnteroom() {
+  const h = 4.2;
+  box(0.15, h, 4.8, mats.wall, new THREE.Vector3(-5, h / 2, 7.6));
+  box(0.15, h, 4.8, mats.wall, new THREE.Vector3(5, h / 2, 7.6));
+  box(3.5, h, 0.15, mats.wall, new THREE.Vector3(-3.25, h / 2, 10));
+  box(3.5, h, 0.15, mats.wall, new THREE.Vector3(3.25, h / 2, 10));
+  box(3.0, 1.0, 0.15, mats.wall, new THREE.Vector3(0, 3.7, 10));
+  box(10.3, 0.16, 5.1, mats.wall, new THREE.Vector3(0, 4.28, 7.55));
+  addCollider(-5.1, -4.9, 5.2, 10.1);
+  addCollider(4.9, 5.1, 5.2, 10.1);
+  addCollider(-5.1, -1.5, 9.9, 10.1);
+  addCollider(1.5, 5.1, 9.9, 10.1);
 }
 
 function addRack(x, z) {
@@ -296,46 +315,282 @@ function addRack(x, z) {
 }
 
 const coldParticles = [];
-function addFan(x) {
-  const group = new THREE.Group();
-  group.position.set(x, 2.95, -6.82);
-  scene.add(group);
-  const housing = new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.86, 0.25),
-    new THREE.MeshStandardMaterial({ color: 0xe5edf5, roughness: 0.5, metalness: 0.2 }));
-  housing.castShadow = true;
-  group.add(housing);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.035, 12, 48), mats.darkSteel);
-  ring.position.z = 0.16;
-  group.add(ring);
-  const bladeMat = new THREE.MeshStandardMaterial({ color: 0x536170, roughness: 0.42, metalness: 0.55 });
-  const bladeGroup = new THREE.Group();
-  bladeGroup.position.z = 0.18;
-  group.add(bladeGroup);
-  for (let i = 0; i < 4; i++) {
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.025), bladeMat);
-    blade.position.y = 0.17;
-    blade.rotation.z = i * Math.PI / 2 + 0.34;
-    bladeGroup.add(blade);
+
+// 制冷管路: 从东侧机房穿墙进库, 保温回气管(粗) + 铜供液管(细) 吊顶下
+// 敷设, 沿库房纵向送至两台冷风机的立管接口; 每台冷风机的化霜排水管
+// 坡向就近墙面落地。现代氟机冷风机库顶面无排管, 只走管路与吊架。
+function addRefrigerantPiping() {
+  const suctionMat = new THREE.MeshStandardMaterial({ color: 0xd9dee3, roughness: 0.82, metalness: 0.05 });
+  const liquidMat = new THREE.MeshStandardMaterial({ color: 0xa96f33, roughness: 0.35, metalness: 0.8 });
+  const drainMat = new THREE.MeshStandardMaterial({ color: 0xe6e9ec, roughness: 0.7, metalness: 0.05 });
+
+  const seg = (mat, r, a, b) => {
+    const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, d.length(), 14), mat);
+    m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+    if (Math.abs(d.x) > 0.01) m.rotation.z = Math.PI / 2;
+    else if (Math.abs(d.z) > 0.01) m.rotation.x = Math.PI / 2;
+    m.castShadow = true;
+    scene.add(m);
+  };
+  const joint = (mat, r, p) => {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r * 1.35, 12, 10), mat);
+    s.position.set(p[0], p[1], p[2]);
+    scene.add(s);
+  };
+
+  // 回气管 (保温, DN100): 东墙 -> 西行 -> 折向库尾, 途经两台冷风机上方
+  const SR = 0.055;
+  seg(suctionMat, SR, [6.91, 5.62, 3.9], [1.2, 5.62, 3.9]);
+  seg(suctionMat, SR, [1.2, 5.62, 3.9], [1.2, 5.62, -12.3]);
+  [[1.2, 5.62, 3.9], [1.2, 5.62, -3.9], [1.2, 5.62, -12.15]].forEach((p) => joint(suctionMat, SR, p));
+
+  // 供液管 (铜, DN25): 与回气管并行
+  const LR = 0.026;
+  seg(liquidMat, LR, [6.91, 5.56, 3.72], [1.0, 5.56, 3.72]);
+  seg(liquidMat, LR, [1.0, 5.56, 3.72], [1.0, 5.56, -12.3]);
+  [[1.0, 5.56, 3.72], [1.0, 5.56, -3.9], [1.0, 5.56, -12.15]].forEach((p) => joint(liquidMat, LR, p));
+
+  // 管道吊架: 吊杆 + 横担, 沿走向每 ~2.5m 一处
+  const trapeze = (x, z, alongX) => {
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.23, 8), mats.darkSteel);
+    rod.position.set(x, 5.795, z);
+    scene.add(rod);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(alongX ? 0.06 : 0.46, 0.035, alongX ? 0.42 : 0.06), mats.darkSteel);
+    bar.position.set(x, 5.665, z);
+    scene.add(bar);
+  };
+  for (let z = 2.2; z > -12; z -= 2.5) trapeze(1.1, z, false);
+  [3.2, 5.2].forEach((hx) => trapeze(hx, 3.81, true));
+
+  // 穿墙洞封板 (东墙, 机房侧)
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.55, 0.55),
+    new THREE.MeshStandardMaterial({ color: 0x5c6873, roughness: 0.4, metalness: 0.6 }));
+  plate.position.set(6.93, 5.6, 3.81);
+  scene.add(plate);
+
+  // 库外段: 沿外墙落至压缩机组接管高度
+  seg(suctionMat, SR, [7.0, 5.62, 3.9], [7.3, 5.62, 3.9]);
+  seg(suctionMat, SR, [7.3, 5.62, 3.9], [7.3, 1.3, 3.9]);
+  seg(suctionMat, SR, [7.3, 1.3, 3.9], [9.5, 1.3, 3.9]);
+  joint(suctionMat, SR, [7.3, 5.62, 3.9]);
+  joint(suctionMat, SR, [7.3, 1.3, 3.9]);
+  seg(liquidMat, LR, [7.0, 5.56, 3.72], [7.3, 5.56, 3.72]);
+  seg(liquidMat, LR, [7.3, 5.56, 3.72], [7.3, 1.15, 3.72]);
+  seg(liquidMat, LR, [7.3, 1.15, 3.72], [9.5, 1.15, 3.72]);
+  joint(liquidMat, LR, [7.3, 5.56, 3.72]);
+  joint(liquidMat, LR, [7.3, 1.15, 3.72]);
+
+  // 化霜排水管 (PVC): 后墙机组坡向后墙落地; 中段机组坡向东墙落地
+  const DR = 0.032;
+  seg(drainMat, DR, [1.55, 4.3, -12.15], [1.55, 4.3, -12.75]);
+  seg(drainMat, DR, [1.55, 4.3, -12.75], [1.55, 0.08, -12.75]);
+  joint(drainMat, DR, [1.55, 4.3, -12.75]);
+  seg(drainMat, DR, [1.55, 4.3, -3.9], [6.75, 4.3, -3.9]);
+  seg(drainMat, DR, [6.75, 4.3, -3.9], [6.75, 0.08, -3.9]);
+  joint(drainMat, DR, [6.75, 4.3, -3.9]);
+
+  // 每台冷风机液管支路阀组: 手动截止阀 (红手轮) + 电磁阀, 装在支路三通上游
+  const valveMat = new THREE.MeshStandardMaterial({ color: 0x3a424b, roughness: 0.4, metalness: 0.7 });
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0xb03028, roughness: 0.5, metalness: 0.4 });
+  [-3.9, -12.15].forEach((uz) => {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.13, 0.09), valveMat);
+    body.position.set(1.0, 5.56, uz + 0.42);
+    scene.add(body);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.1, 8), valveMat);
+    stem.position.set(1.0, 5.63, uz + 0.42);
+    scene.add(stem);
+    const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.011, 8, 20), wheelMat);
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(1.0, 5.69, uz + 0.42);
+    scene.add(wheel);
+    const solenoid = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.06), valveMat);
+    solenoid.position.set(1.0, 5.62, uz + 0.72);
+    scene.add(solenoid);
+  });
+}
+
+// 吊顶综合管线: 电缆桥架 (机组动力/照明配电) + 消防喷淋干支管与下垂喷头
+// —— 真实冷库顶面除制冷工艺管外的常规机电设施
+function addCeilingServices() {
+  const trayMat = new THREE.MeshStandardMaterial({ color: 0x4b555f, roughness: 0.5, metalness: 0.65 });
+  const conduitMat = new THREE.MeshStandardMaterial({ color: 0xb9c2c9, roughness: 0.45, metalness: 0.5 });
+  const fireMat = new THREE.MeshStandardMaterial({ color: 0xa63226, roughness: 0.55, metalness: 0.35 });
+  const brassMat = new THREE.MeshStandardMaterial({ color: 0xb08d3e, roughness: 0.35, metalness: 0.8 });
+
+  const bar = (mat, w, h, d, x, y, z) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    scene.add(m);
+    return m;
+  };
+  const tube = (mat, r, a, b) => {
+    const dv = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, dv.length(), 10), mat);
+    m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+    if (Math.abs(dv.x) > 0.01) m.rotation.z = Math.PI / 2;
+    else if (Math.abs(dv.z) > 0.01) m.rotation.x = Math.PI / 2;
+    scene.add(m);
+    return m;
+  };
+
+  // ---- 电缆桥架: 东墙引入 -> 沿库房纵向, 每 2.5m 吊架 ----
+  const TY = 5.72;                     // 桥架底面高
+  bar(trayMat, 4.31, 0.02, 0.32, 4.755, TY, 4.45);           // 引入段 (沿 x)
+  [4.45 - 0.15, 4.45 + 0.15].forEach((bz) => bar(trayMat, 4.31, 0.09, 0.02, 4.755, TY + 0.045, bz));
+  bar(trayMat, 0.32, 0.02, 17.1, 2.6, TY, -4.0);             // 纵向主段 (沿 z)
+  [2.6 - 0.15, 2.6 + 0.15].forEach((bx) => bar(trayMat, 0.02, 0.09, 17.1, bx, TY + 0.045, -4.0));
+  for (let z = 4.0; z > -12.5; z -= 2.5) {
+    tube(mats.darkSteel, 0.013, [2.6, 5.91, z], [2.6, TY + 0.09, z]);
   }
-  fans.push(bladeGroup);
+
+  // ---- 照明线管: 桥架 -> 各灯具 (横穿吊顶, 末端下垂) ----
+  [[-3.5, 1.0], [3.5, 1.0], [-3.5, -4.5], [3.5, -4.5], [-3.5, -10.0], [3.5, -10.0]].forEach(([lx, lz]) => {
+    tube(conduitMat, 0.014, [2.6, 5.88, lz], [lx, 5.88, lz]);
+    tube(conduitMat, 0.014, [lx, 5.88, lz], [lx, 5.06, lz]);
+  });
+
+  // ---- 机组动力: 桥架 -> 接线盒 (箱体顶) ----
+  [-3.9, -12.15].forEach((uz) => {
+    bar(trayMat, 0.14, 0.12, 0.12, 1.6, 5.62, uz);
+    tube(conduitMat, 0.014, [1.6, 5.68, uz], [1.6, 5.88, uz]);
+    tube(conduitMat, 0.014, [1.6, 5.88, uz], [2.6, 5.88, uz]);
+  });
+
+  // ---- 消防喷淋: 东墙引入干管 -> 纵向配水管 -> 5 路支管, 每路 4 只下垂喷头 ----
+  const FY = 5.84;
+  tube(fireMat, 0.048, [6.91, FY, -1.6], [-1.4, FY, -1.6]);            // 引入干管
+  tube(fireMat, 0.048, [-1.4, FY, 3.1], [-1.4, FY, -11.2]);            // 纵向配水管
+  const fj = (p) => {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(0.062, 10, 8), fireMat);
+    s.position.set(p[0], p[1], p[2]);
+    scene.add(s);
+  };
+  fj([-1.4, FY, -1.6]);
+  [3.1, -0.5, -4.1, -7.7, -11.2].forEach((bz) => {
+    tube(fireMat, 0.028, [-6.4, FY, bz], [6.4, FY, bz]);               // 支管
+    fj([-1.4, FY, bz]);
+    [-5.25, -1.75, 1.75, 5.25].forEach((hx) => {                       // 下垂喷头
+      tube(brassMat, 0.011, [hx, FY, bz], [hx, FY - 0.1, bz]);
+      const deflector = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.006, 12), brassMat);
+      deflector.position.set(hx, FY - 0.105, bz);
+      scene.add(deflector);
+    });
+  });
+
+  // 消防管穿墙封板
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x5c6873, roughness: 0.4, metalness: 0.6 }));
+  plate.position.set(6.93, FY, -1.6);
+  scene.add(plate);
+}
+
+// 吊顶式冷风机 (DD 系列): 白色箱体吊装在顶板下, 正面一排 3 台大轴流风扇
+// 水平吹风; 两台前后接力布置 (后墙一台朝门吹 + 库房中段一台续程),
+// 底部回风口 + 接水盘, 顶部供液/回气立管接入吊顶主管路; 化霜时风扇停转
+const MIST_SOURCES = [];            // 冷雾发生点, 由冷风机出风口填充
+function addUnitCoolers() {
+  const casingMat = new THREE.MeshStandardMaterial({ color: 0xf0f3f5, roughness: 0.5, metalness: 0.15 });
+  const recessMat = new THREE.MeshStandardMaterial({ color: 0x14181d, roughness: 0.8, metalness: 0.2 });
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0x1b2026, roughness: 0.45, metalness: 0.5, side: THREE.DoubleSide });
+  const bladeMat = new THREE.MeshStandardMaterial({ color: 0x22282f, roughness: 0.4, metalness: 0.55, side: THREE.DoubleSide });
+  const W = 3.9, H = 1.0, D = 0.75;   // 箱体尺寸
+  const CY = 5.05;                    // 箱体中心高 (顶 5.55, 底 4.55, 货架顶上方 >1m 回风空间)
+  const FAN_XS = [-1.25, 0, 1.25];    // 每台 3 风扇
+  const R = 0.56;                     // 风筒半径 (叶轮直径 ~1m)
+  const bladeGeo = new THREE.BoxGeometry(0.36, 0.3, 0.02);
+
+  [-12.15, -3.9].forEach((uz) => {
+    const g = new THREE.Group();
+    g.position.set(0, CY, uz);
+    scene.add(g);
+    const front = D / 2;              // 出风面朝 +z (库门方向)
+
+    const casing = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), casingMat);
+    casing.castShadow = true;
+    casing.receiveShadow = true;
+    g.add(casing);
+
+    FAN_XS.forEach((fx) => {
+      // 风扇暗色凹腔背景
+      const recess = new THREE.Mesh(new THREE.CircleGeometry(R - 0.01, 28), recessMat);
+      recess.position.set(fx, 0, front + 0.005);
+      g.add(recess);
+      // 短风筒 + 前沿包边
+      const duct = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 0.22, 30, 1, true), ringMat);
+      duct.rotation.x = Math.PI / 2;
+      duct.position.set(fx, 0, front + 0.11);
+      g.add(duct);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.028, 10, 36), ringMat);
+      rim.position.set(fx, 0, front + 0.22);
+      g.add(rim);
+      // 叶轮: 轮毂 + 7 片宽桨叶, 绕 z 轴旋转 (水平送风)
+      const rotor = new THREE.Group();
+      rotor.position.set(fx, 0, front + 0.13);
+      g.add(rotor);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.12, 18), bladeMat);
+      hub.rotation.x = Math.PI / 2;
+      rotor.add(hub);
+      for (let i = 0; i < 7; i++) {
+        const th = (i / 7) * Math.PI * 2;
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.set(Math.cos(th) * 0.32, Math.sin(th) * 0.32, 0);
+        blade.rotation.z = th;
+        blade.rotateX(0.55);
+        rotor.add(blade);
+      }
+      rotor.userData = { evap: true, speed: 16 };
+      fans.push(rotor);
+      MIST_SOURCES.push({ x: fx, y: CY, z: uz + front + 0.3 });
+    });
+
+    // 底部深色回风口 + 接水盘 (双水盘) + 排水短管
+    const inlet = new THREE.Mesh(new THREE.BoxGeometry(W - 0.24, 0.03, D - 0.22), recessMat);
+    inlet.position.y = -H / 2 - 0.005;
+    g.add(inlet);
+    const pan = new THREE.Mesh(new THREE.BoxGeometry(W + 0.12, 0.07, D + 0.28), mats.steel);
+    pan.position.y = -H / 2 - 0.075;
+    pan.castShadow = true;
+    g.add(pan);
+    const drain = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.16, 10), mats.steel);
+    drain.position.set(W / 2 - 0.4, -H / 2 - 0.18, 0);
+    g.add(drain);
+
+    // 吊杆 4 根接顶板 + 供液/回气立管上接吊顶主管路
+    [[-W / 2 + 0.35, -D / 2 + 0.12], [W / 2 - 0.35, -D / 2 + 0.12],
+     [-W / 2 + 0.35, D / 2 - 0.12], [W / 2 - 0.35, D / 2 - 0.12]].forEach(([rx, rz]) => {
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.38, 8), mats.darkSteel);
+      rod.position.set(rx, H / 2 + 0.18, rz);
+      g.add(rod);
+    });
+    [[W / 2 - 0.75, 0.05, 0xd9dee3, 0.82, 0.05], [W / 2 - 0.95, 0.026, 0xa96f33, 0.35, 0.8]].forEach(([px, pr, pc, prough, pmetal]) => {
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(pr, pr, 0.32, 12),
+        new THREE.MeshStandardMaterial({ color: pc, roughness: prough, metalness: pmetal }));
+      pipe.position.set(px, H / 2 + 0.16, 0);
+      g.add(pipe);
+    });
+  });
 }
 
 function addColdMist() {
-  const count = 360;
+  const count = 480;
   const geo = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
   const velocities = [];
+  const srcs = [];
   for (let i = 0; i < count; i++) {
-    const fanX = [-1.7, 0, 1.7][i % 3];
-    positions[i * 3] = fanX + (Math.random() - 0.5) * 0.55;
-    positions[i * 3 + 1] = 2.72 + (Math.random() - 0.5) * 0.45;
-    positions[i * 3 + 2] = -6.15 + Math.random() * 0.4;
-    velocities.push(new THREE.Vector3((Math.random() - 0.5) * 0.18, (Math.random() - 0.5) * 0.04, 0.7 + Math.random() * 0.7));
+    const s = MIST_SOURCES[i % MIST_SOURCES.length];
+    srcs.push(s);
+    positions[i * 3] = s.x + (Math.random() - 0.5) * 0.7;
+    positions[i * 3 + 1] = s.y + (Math.random() - 0.5) * 0.5;
+    positions[i * 3 + 2] = s.z + Math.random() * 0.3;
+    velocities.push(new THREE.Vector3((Math.random() - 0.5) * 0.18, (Math.random() - 0.5) * 0.04, 0.9 + Math.random() * 0.8));
   }
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   const points = new THREE.Points(geo, mats.coldMist);
   scene.add(points);
-  coldParticles.push({ points, positions, velocities, count });
+  coldParticles.push({ points, positions, velocities, srcs, count });
 }
 
 // 开门冷气外泄粒子 (强度由后端 door_frac 驱动)
@@ -357,32 +612,42 @@ function addDoorMist() {
   doorMistSys = { points, positions, vel, count };
 }
 
-function pipe(points, radius, material) {
-  const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(p[0], p[1], p[2])));
-  const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 70, radius, 12, false), material);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-  return mesh;
+// 风幕机气流粒子 (开门时自门楣垂直向下吹, 挡住热空气)
+let airCurtainSys = null;
+function addAirCurtain() {
+  const count = 90;
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  const vel = [];
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = -1.3 + Math.random() * 2.6;
+    positions[i * 3 + 1] = 3.5 - Math.random() * 3.3;
+    positions[i * 3 + 2] = 4.74 + Math.random() * 0.12;
+    vel.push(2.2 + Math.random() * 1.4);
+  }
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const points = new THREE.Points(geo, mats.airStream);
+  scene.add(points);
+  airCurtainSys = { points, positions, vel, count };
 }
 
 function addEquipment() {
-  box(7, 0.35, 2.6, mats.darkSteel, new THREE.Vector3(9.4, 0.28, 4.4));
-  box(1.35, 1.8, 1.1, new THREE.MeshStandardMaterial({ color: 0xd6d0bc, roughness: 0.58, metalness: 0.25 }), new THREE.Vector3(11.1, 1.34, 4.0));
+  box(7, 0.35, 2.6, mats.darkSteel, new THREE.Vector3(11.8, 0.28, 4.4));
+  box(1.35, 1.8, 1.1, new THREE.MeshStandardMaterial({ color: 0xd6d0bc, roughness: 0.58, metalness: 0.25 }), new THREE.Vector3(13.5, 1.34, 4.0));
   for (let i = 0; i < 3; i++) {
-    cyl(0.45, 1.65, mats.compressor, new THREE.Vector3(7.1 + i * 1.45, 1.22, 4.35));
-    cyl(0.18, 1.35, mats.darkSteel, new THREE.Vector3(7.1 + i * 1.45, 1.2, 3.35), new THREE.Euler(Math.PI / 2, 0, 0));
+    cyl(0.45, 1.65, mats.compressor, new THREE.Vector3(9.5 + i * 1.45, 1.22, 4.35));
+    cyl(0.18, 1.35, mats.darkSteel, new THREE.Vector3(9.5 + i * 1.45, 1.2, 3.35), new THREE.Euler(Math.PI / 2, 0, 0));
   }
-  box(4.7, 1.9, 2.3, mats.steel, new THREE.Vector3(10.2, 3.2, -2.3));
+  box(4.7, 1.9, 2.3, mats.steel, new THREE.Vector3(12.6, 3.2, -2.3));
   // 冷凝器支腿 (箱体底面 y=2.25)
-  [[8.1, -3.2], [8.1, -1.4], [12.3, -3.2], [12.3, -1.4]].forEach(([x, z]) => {
+  [[10.5, -3.2], [10.5, -1.4], [14.7, -3.2], [14.7, -1.4]].forEach(([x, z]) => {
     box(0.14, 2.3, 0.14, mats.darkSteel, new THREE.Vector3(x, 1.15, z));
   });
   const finMat = new THREE.MeshStandardMaterial({ color: 0x1a242e, roughness: 0.56, metalness: 0.4 });
   for (let i = 0; i < 7; i++) {
-    box(0.06, 1.7, 2.35, finMat, new THREE.Vector3(8.05 + i * 0.7, 3.2, -2.3), false, true);
+    box(0.06, 1.7, 2.35, finMat, new THREE.Vector3(10.45 + i * 0.7, 3.2, -2.3), false, true);
   }
-  [[9.15, -2.95], [11.25, -1.65]].forEach(([x, z]) => {
+  [[11.55, -2.95], [13.65, -1.65]].forEach(([x, z]) => {
     const topFan = new THREE.Group();
     topFan.position.set(x, 4.25, z);
     scene.add(topFan);
@@ -392,54 +657,68 @@ function addEquipment() {
     fans.push(topFan);
   });
 
-  // 制冷管路: 沿外墙门顶上方管廊 (y 3.95/4.12/4.29, z=5.34), 到对应风机 x 位
-  // 垂直 90° 穿墙(加套管), 墙内沿吊顶到蒸发器风机
-  pipe([[7.15, 1.75, 4.4], [6.9, 3.2, 5.0], [6.2, 3.95, 5.34], [1.7, 3.95, 5.34],
-        [1.7, 3.95, 4.7], [1.7, 4.02, -4.6], [1.7, 3.1, -6.5]], 0.08, mats.blueSteel);
-  pipe([[8.5, 1.55, 4.0], [7.6, 2.6, 4.9], [6.0, 4.12, 5.34], [0, 4.12, 5.34],
-        [0, 4.12, 4.7], [0, 4.2, -4.6], [0, 3.1, -6.5]], 0.07, mats.yellowPipe);
-  pipe([[10.2, 4.2, -2.3], [10.6, 4.6, 1.5], [9.0, 4.3, 5.0], [7.0, 4.29, 5.34],
-        [-1.7, 4.29, 5.34], [-1.7, 4.29, 4.7], [-1.7, 4.2, -4.6], [-1.7, 3.1, -6.5]], 0.07, mats.redSteel);
-  // 穿墙套管
-  [[1.7, 3.95], [0, 4.12], [-1.7, 4.29]].forEach(([x, y]) => {
-    cyl(0.13, 0.3, mats.darkSteel, new THREE.Vector3(x, y, 5.11), new THREE.Euler(Math.PI / 2, 0, 0), 20);
-  });
-  // 管廊墙面支架
-  [[2.6, 3.95], [4.3, 3.95], [0.9, 4.12], [3.2, 4.12], [-1.0, 4.29], [2.0, 4.29]].forEach(([x, y]) => {
-    box(0.06, 0.06, 0.26, mats.darkSteel, new THREE.Vector3(x, y, 5.23), false, false);
-  });
-  // 跨越段支撑立柱 (设备区到建筑之间 / 冷凝器到墙之间)
-  box(0.1, 4.35, 0.1, mats.steel, new THREE.Vector3(5.35, 2.175, 5.34));
-  box(0.1, 4.55, 0.1, mats.steel, new THREE.Vector3(10.55, 2.275, 1.5));
-  addCollider(5.9, 12.8, 3.0, 5.8);
-  addCollider(7.85, 12.55, -3.45, -1.15);
+  addCollider(8.3, 15.2, 3.0, 5.8);
+  addCollider(10.25, 14.95, -3.45, -1.15);
 }
 
 // ---------------------------------------------------------------- 现实感细节
 let curtainGroup = null;
+let outerCurtainGroup = null;
 let sparkleSys = null;
+let alarmBtnMesh = null;
 function addRealismDetails() {
   // 建筑外墙底部踢脚板
   const skirtMat = new THREE.MeshStandardMaterial({ color: 0x262c33, roughness: 0.7, metalness: 0.2 });
-  box(3.17, 0.4, 0.06, skirtMat, new THREE.Vector3(-3.165, 0.2, 5.13), false, false);
-  box(3.17, 0.4, 0.06, skirtMat, new THREE.Vector3(3.165, 0.2, 5.13), false, false);
-  box(0.06, 0.4, 12, skirtMat, new THREE.Vector3(-4.86, 0.2, -1), false, false);
-  box(0.06, 0.4, 12, skirtMat, new THREE.Vector3(4.86, 0.2, -1), false, false);
-  box(9.5, 0.4, 0.06, skirtMat, new THREE.Vector3(0, 0.2, -7.11), false, false);
+  box(5.53, 0.4, 0.06, skirtMat, new THREE.Vector3(-4.235, 0.2, 5.13), false, false);
+  box(5.53, 0.4, 0.06, skirtMat, new THREE.Vector3(4.235, 0.2, 5.13), false, false);
+  box(0.06, 0.4, 18, skirtMat, new THREE.Vector3(-7.11, 0.2, -4), false, false);
+  box(0.06, 0.4, 18, skirtMat, new THREE.Vector3(7.11, 0.2, -4), false, false);
+  box(14, 0.4, 0.06, skirtMat, new THREE.Vector3(0, 0.2, -13.11), false, false);
 
   // 墙面标识牌
-  const mkSign = (t, w, h, pos) => {
+  const mkSign = (t, w, h, pos, rotY = 0) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
       new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, metalness: 0.1 }));
     m.position.copy(pos);
+    m.rotation.y = rotY;
     scene.add(m);
   };
   mkSign(TEX.signTexture(["1号低温冷库  -18℃"], { w: 1024, h: 192, bg: "#123f7d" }),
     2.4, 0.46, new THREE.Vector3(0, 3.78, 5.125));
   mkSign(TEX.signTexture(["低温环境", "注意防寒"]),
-    0.72, 0.52, new THREE.Vector3(2.1, 2.35, 5.125));
+    0.72, 0.52, new THREE.Vector3(-3.0, 2.35, 5.125));
   mkSign(TEX.signTexture(["当心滑倒"], { bg: "#d8a012", fg: "#1c1c1c", h: 128 }),
     0.72, 0.38, new THREE.Vector3(-2.1, 2.35, 5.125));
+  mkSign(TEX.signTexture(["收发货穿堂 · 闲人免进"], { w: 1024, h: 160, bg: "#155086" }),
+    2.2, 0.34, new THREE.Vector3(0, 3.72, 10.09));
+
+  // 库内紧急报警按钮 (门旁, 准星对准按 E 触发)
+  alarmBtnMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.26, 0.09),
+    new THREE.MeshStandardMaterial({ color: 0xb32020, emissive: 0xff3020, emissiveIntensity: 0.6, roughness: 0.4 }));
+  alarmBtnMesh.position.set(-2.0, 1.5, 4.85);
+  alarmBtnMesh.userData.interactive = "alarm";
+  scene.add(alarmBtnMesh);
+  mkSign(TEX.signTexture(["紧急报警"], { bg: "#8a1414", h: 128 }),
+    0.5, 0.2, new THREE.Vector3(-2.0, 1.78, 4.87), Math.PI);
+
+  // 温度记录仪 (穿堂内, 门旁墙面)
+  box(0.34, 0.46, 0.09, new THREE.MeshStandardMaterial({ color: 0xf2f4f6, roughness: 0.5, metalness: 0.1 }),
+    new THREE.Vector3(-3.9, 1.65, 5.16), false, false);
+  const recScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.14),
+    new THREE.MeshStandardMaterial({ color: 0x0a1a10, emissive: 0x2fd06a, emissiveIntensity: 0.9, roughness: 0.3 }));
+  recScreen.position.set(-3.9, 1.76, 5.21);
+  scene.add(recScreen);
+  mkSign(TEX.signTexture(["温度记录仪"], { h: 96 }),
+    0.4, 0.12, new THREE.Vector3(-3.9, 1.34, 5.21));
+
+  // 压力平衡阀 (右前墙高处, 平衡开关门/降温造成的库内外气压差)
+  const valveMat = new THREE.MeshStandardMaterial({ color: 0x9aa6b0, roughness: 0.45, metalness: 0.5 });
+  box(0.52, 0.52, 0.1, valveMat, new THREE.Vector3(5.9, 5.05, 5.14), false, false);
+  box(0.52, 0.52, 0.1, valveMat, new THREE.Vector3(5.9, 5.05, 4.86), false, false);
+  for (let i = 0; i < 4; i++) {
+    const slat = box(0.44, 0.07, 0.03, mats.darkSteel, new THREE.Vector3(5.9, 4.88 + i * 0.115, 5.2), false, false);
+    slat.rotation.x = 0.55;
+  }
 
   // PVC 软门帘 (门洞内侧, 开门时随气流摆动)
   curtainGroup = new THREE.Group();
@@ -458,14 +737,30 @@ function addRealismDetails() {
     curtainGroup.add(p);
   }
 
+  // 穿堂外口软门帘 (外口无门, 软帘挡风遮尘)
+  outerCurtainGroup = new THREE.Group();
+  outerCurtainGroup.position.set(0, 3.2, 9.96);
+  scene.add(outerCurtainGroup);
+  for (let i = 0; i < 5; i++) {
+    const geo = new THREE.PlaneGeometry(0.66, 3.12);
+    geo.translate(0, -1.56, 0);
+    const p = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      map: ct, transparent: true, side: THREE.DoubleSide, depthWrite: false,
+      roughness: 0.22, metalness: 0, envMapIntensity: 0.7,
+    }));
+    p.position.set(-1.3 + i * 0.65, 0, 0);
+    p.userData.phase = i * 1.3;
+    outerCurtainGroup.add(p);
+  }
+
   // 库内飘落霜晶
-  const n = 130;
+  const n = 240;
   const pos = new Float32Array(n * 3);
   const vel = [];
   for (let i = 0; i < n; i++) {
-    pos[i * 3] = -4.4 + Math.random() * 8.8;
-    pos[i * 3 + 1] = Math.random() * 4.2;
-    pos[i * 3 + 2] = -6.8 + Math.random() * 11.5;
+    pos[i * 3] = -6.6 + Math.random() * 13.2;
+    pos[i * 3 + 1] = Math.random() * 5.7;
+    pos[i * 3 + 2] = -12.7 + Math.random() * 17.5;
     vel.push(0.06 + Math.random() * 0.12);
   }
   const g = new THREE.BufferGeometry();
@@ -481,44 +776,74 @@ function addRealismDetails() {
 function addSafetyDetails() {
   const bollardMat = new THREE.MeshStandardMaterial({ color: 0xe1ac18, roughness: 0.48, metalness: 0.24 });
   const stripeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5, metalness: 0.1 });
-  [[-3.8, 6.2], [3.8, 6.2], [6.2, 5.95], [13.1, 5.95]].forEach(([x, z]) => {
+  [[-3.8, 6.2], [3.8, 6.2], [8.6, 5.95], [15.5, 5.95]].forEach(([x, z]) => {
     cyl(0.13, 1.25, bollardMat, new THREE.Vector3(x, 0.62, z));
     cyl(0.135, 0.18, stripeMat, new THREE.Vector3(x, 0.48, z));
     cyl(0.135, 0.18, stripeMat, new THREE.Vector3(x, 0.9, z));
     addCollider(x - 0.15, x + 0.15, z - 0.15, z + 0.15);
   });
-  box(0.08, 0.1, 16, mats.yellowPipe, new THREE.Vector3(6.2, 0.05, 6.2), false, false);
+  box(0.08, 0.1, 16, mats.yellowPipe, new THREE.Vector3(8.6, 0.05, 6.2), false, false);
 }
 
-// ---------------------------------------------------------------- 库门 (后端物理驱动)
+// ---------------------------------------------------------------- 库门 (电动平移门, 后端物理驱动)
 const doorGroup = new THREE.Group();
 let doorSlabMesh = null;
+let airCurtainLED = null;
 function buildDoor() {
-  doorGroup.position.set(1.35, 0, 5.15);
+  doorGroup.position.set(0, 0, 5.24);
   scene.add(doorGroup);
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(2.7, 3.55, 0.22),
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(2.9, 3.7, 0.13),
     new THREE.MeshStandardMaterial({ map: doorT.map, roughnessMap: doorT.rough, roughness: 1.0, metalness: 0.55 }));
-  slab.position.set(-1.35, 1.775, 0);
+  slab.position.set(0, 1.85, 0);
   slab.castShadow = true;
   slab.receiveShadow = true;
   slab.userData.interactive = "door";
   doorGroup.add(slab);
   doorSlabMesh = slab;
 
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.18, 24),
-    new THREE.MeshStandardMaterial({ color: 0x27a347, roughness: 0.4, metalness: 0.45 }));
-  handle.rotation.x = Math.PI / 2;
-  handle.position.set(-1.05, 0.35, 0.2);
-  slab.add(handle);
-  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.72, 0.1), mats.steel);
-  lever.position.set(-1.05, 0, 0.31);
+  // 外侧竖向拉手
+  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.85, 0.09), mats.steel);
+  lever.position.set(-1.15, -0.15, 0.11);
   slab.add(lever);
-  // 铰链
-  [-1.3, 0, 1.3].forEach((y) => {
-    const knuckle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 12), mats.darkSteel);
-    knuckle.position.set(1.32, y, 0);
-    slab.add(knuckle);
+  // 内侧应急开门推杆 (被困人员从库内可推开, 教学安全点)
+  const pushBar = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.11, 0.09),
+    new THREE.MeshStandardMaterial({ color: 0x27a347, roughness: 0.4, metalness: 0.3 }));
+  pushBar.position.set(-0.85, -0.8, -0.12);
+  slab.add(pushBar);
+  const escSign = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.3),
+    new THREE.MeshStandardMaterial({ map: TEX.signTexture(["应急开门 · 推"], { bg: "#1c7a34", h: 128 }), roughness: 0.5 }));
+  escSign.rotation.y = Math.PI;
+  escSign.position.set(-0.85, -0.42, -0.075);
+  slab.add(escSign);
+  // 吊轮支架 (挂在导轨上随门滑动)
+  [-1.1, 1.1].forEach((hx) => {
+    const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.3, 0.08), mats.darkSteel);
+    bracket.position.set(hx, 1.98, 0.02);
+    slab.add(bracket);
+    const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.06, 16), mats.steel);
+    roller.rotation.x = Math.PI / 2;
+    roller.position.set(hx, 2.13, 0.03);
+    slab.add(roller);
   });
+
+  // 导轨 (沿前墙外侧, 门向右滑) + 墙面支架 + 端部电机箱
+  box(6.3, 0.12, 0.1, mats.darkSteel, new THREE.Vector3(1.45, 3.98, 5.3));
+  [-1.3, 0.2, 1.7, 3.2, 4.4].forEach((bx) => {
+    box(0.08, 0.08, 0.18, mats.darkSteel, new THREE.Vector3(bx, 3.98, 5.2), false, false);
+  });
+  box(0.55, 0.5, 0.35, new THREE.MeshStandardMaterial({ color: 0x2b4a68, roughness: 0.4, metalness: 0.5 }),
+    new THREE.Vector3(4.35, 3.98, 5.33));
+  // 地面导向槽
+  box(6.0, 0.04, 0.08, mats.darkSteel, new THREE.Vector3(1.45, 0.02, 5.24), false, true);
+
+  // 风幕机 (库内侧门楣上方, 开门时出风; 绿色 LED 指示运行)
+  box(3.0, 0.3, 0.32, new THREE.MeshStandardMaterial({ color: 0xdfe5ea, roughness: 0.4, metalness: 0.35 }),
+    new THREE.Vector3(0, 3.72, 4.72));
+  box(2.8, 0.06, 0.2, mats.darkSteel, new THREE.Vector3(0, 3.55, 4.72), false, false);
+  airCurtainLED = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0x00ff66, emissiveIntensity: 0 }));
+  airCurtainLED.position.set(1.35, 3.72, 4.55);
+  scene.add(airCurtainLED);
 }
 
 // ---------------------------------------------------------------- 动态刚体
@@ -573,7 +898,8 @@ function buildDynamicBodies(manifest) {
   });
 }
 
-const doorTarget = { q: new THREE.Quaternion(), angle: 0 };
+const DOOR_TRAVEL = 2.75;                 // 与后端一致: 平移门全开行程 m
+const doorTarget = { d: 0 };              // 后端下发的滑开位移
 
 function applyState(msg) {
   const arr = msg.b;
@@ -589,8 +915,7 @@ function applyState(msg) {
     }
     dynMeshes[i].visible = s[1] > -1.5;
   }
-  doorTarget.angle = msg.door;
-  doorTarget.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), msg.door);
+  doorTarget.d = msg.door;
 
   // 抓取高亮
   if (msg.held !== heldName) {
@@ -642,7 +967,7 @@ function updateHUD(th, scale, doorOpen) {
 
   ui.doorState.textContent = doorOpen ? "开启" : "关闭";
   ui.doorDot.className = "status-dot " + (doorOpen ? "warn" : "");
-  ui.miniDoor.style.transform = `rotate(${doorTarget.angle * 57.3}deg)`;
+  ui.miniDoor.style.transform = `translateX(${(doorTarget.d * 4.2).toFixed(1)}px)`;
 
   if (th.alarms && th.alarms.length) {
     ui.alarmBanner.textContent = "⚠ " + th.alarms.join(" · ");
@@ -751,21 +1076,31 @@ function showNote(t) {
   noteUntil = performance.now() + 1800;
 }
 
+function triggerManualAlarm() {
+  showNote("报警已发送至值班室");
+  if (alarmBtnMesh) {
+    alarmBtnMesh.material.emissiveIntensity = 2.5;
+    setTimeout(() => { alarmBtnMesh.material.emissiveIntensity = 0.6; }, 1600);
+  }
+}
+
 function checkCrosshair() {
   raycaster.setFromCamera(CENTER, camera);
   raycaster.far = 3.4;
-  const candidates = [doorSlabMesh, ...dynMeshes.filter((m) => m.visible)];
+  const candidates = [doorSlabMesh, alarmBtnMesh, ...dynMeshes.filter((m) => m.visible)].filter(Boolean);
   const hits = raycaster.intersectObjects(candidates, false);
   currentTarget = null;
   if (hits.length) {
     const m = hits[0].object;
     if (m.userData.interactive === "door") currentTarget = { kind: "door", mesh: m };
+    else if (m.userData.interactive === "alarm") currentTarget = { kind: "alarm", mesh: m };
     else if (m.userData.grabbable) currentTarget = { kind: "body", mesh: m };
   }
   let label = "";
   if (performance.now() < noteUntil) label = noteText;
   else if (heldName) label = "按 F 放下 · 左键投掷";
-  else if (currentTarget?.kind === "door") label = Math.abs(doorTarget.angle) > 0.3 ? "按 E 关门" : "按 E 开门";
+  else if (currentTarget?.kind === "door") label = doorTarget.d > 0.4 ? "按 E 关门" : "按 E 开门";
+  else if (currentTarget?.kind === "alarm") label = "按 E 触发紧急报警";
   else if (currentTarget?.kind === "body") label = "按 F 抓取";
   ui.targetLabel.textContent = label;
   ui.targetLabel.classList.toggle("active", Boolean(label));
@@ -777,6 +1112,7 @@ document.addEventListener("keydown", (e) => {
   switch (e.code) {
     case "KeyE":
       if (currentTarget?.kind === "door") send({ c: "door" });
+      else if (currentTarget?.kind === "alarm") triggerManualAlarm();
       break;
     case "KeyF": {
       const pd = camPosDir();
@@ -829,8 +1165,8 @@ function canMoveTo(next) {
     if (next.x + radius > c.minX && next.x - radius < c.maxX &&
         next.z + radius > c.minZ && next.z - radius < c.maxZ) return false;
   }
-  // 库门未开足时阻挡门洞
-  if (Math.abs(doorTarget.angle) < 0.9 &&
+  // 库门未滑开足够时阻挡门洞
+  if (doorTarget.d < 1.3 &&
       next.x > -1.45 && next.x < 1.45 && next.z > 4.78 && next.z < 5.5) return false;
   return true;
 }
@@ -890,35 +1226,42 @@ function updateAnimations(delta, elapsed) {
     if (blob) {
       blob.visible = m.visible;
       if (m.visible) {
-        const inside = Math.abs(m.position.x) < 4.7 && m.position.z > -6.9 && m.position.z < 5.0;
+        const inside = Math.abs(m.position.x) < 6.9 && m.position.z > -12.9 && m.position.z < 5.0;
         blob.position.set(m.position.x, inside ? 0.078 : 0.004, m.position.z);
         blob.material.opacity = THREE.MathUtils.clamp(0.55 - m.position.y * 0.16, 0.05, 0.5);
       }
     }
   }
-  doorGroup.quaternion.slerp(doorTarget.q, k);
+  doorGroup.position.x += (doorTarget.d - doorGroup.position.x) * k;
 
   // 门帘摆动 (幅度随开门气流增大) 与飘落霜晶
   if (curtainGroup) {
-    const frac = Math.min(Math.abs(doorTarget.angle) / 1.92, 1);
+    const frac = Math.min(doorTarget.d / DOOR_TRAVEL, 1);
     curtainGroup.children.forEach((p) => {
       p.rotation.x = Math.sin(elapsed * 1.6 + p.userData.phase) * (0.015 + frac * 0.11);
+    });
+  }
+  // 穿堂外口软帘 (常年小幅摆动)
+  if (outerCurtainGroup) {
+    outerCurtainGroup.children.forEach((p) => {
+      p.rotation.x = Math.sin(elapsed * 1.1 + p.userData.phase) * 0.05;
     });
   }
   if (sparkleSys) {
     for (let i = 0; i < sparkleSys.n; i++) {
       sparkleSys.pos[i * 3 + 1] -= sparkleSys.vel[i] * delta;
       sparkleSys.pos[i * 3] += Math.sin(elapsed * 0.8 + i) * 0.02 * delta;
-      if (sparkleSys.pos[i * 3 + 1] < 0.12) sparkleSys.pos[i * 3 + 1] = 4.2;
+      if (sparkleSys.pos[i * 3 + 1] < 0.12) sparkleSys.pos[i * 3 + 1] = 5.7;
     }
     sparkleSys.pts.geometry.attributes.position.needsUpdate = true;
   }
 
-  // 蒸发器风机持续送风(仅化霜停); 冷凝器顶部风机跟随压缩机
+  // 冷风机持续送风(仅化霜停); 冷凝器顶部风机跟随压缩机
   const evapRunning = latestTh ? latestTh.comp !== "defrost" : true;
   const compOn = latestTh ? latestTh.comp === "on" : true;
-  fans.forEach((fan, index) => {
-    if (index < 3 ? evapRunning : compOn) fan.rotation.z -= delta * (index < 3 ? 18 : 8);
+  fans.forEach((fan) => {
+    const isEvap = fan.userData.evap === true;
+    if (isEvap ? evapRunning : compOn) fan.rotation.z -= delta * (fan.userData.speed || (isEvap ? 18 : 8));
   });
 
   // 冷雾随化霜淡出/淡入, 不半空冻结
@@ -931,19 +1274,34 @@ function updateAnimations(delta, elapsed) {
         arr[i * 3 + 1] += Math.sin(elapsed * 3 + i) * 0.05 * delta;
         arr[i * 3 + 2] += system.velocities[i].z * delta;
       }
-      if (arr[i * 3 + 2] > 1.4 || arr[i * 3 + 1] < 1.2) {
-        const fanX = [-1.7, 0, 1.7][i % 3];
-        arr[i * 3] = fanX + (Math.random() - 0.5) * 0.55;
-        arr[i * 3 + 1] = 2.72 + (Math.random() - 0.5) * 0.45;
-        arr[i * 3 + 2] = -6.15 + Math.random() * 0.4;
+      const src = system.srcs[i];
+      if (arr[i * 3 + 2] > src.z + 8.0 || arr[i * 3 + 1] < 1.2) {
+        arr[i * 3] = src.x + (Math.random() - 0.5) * 0.7;
+        arr[i * 3 + 1] = src.y + (Math.random() - 0.5) * 0.5;
+        arr[i * 3 + 2] = src.z + Math.random() * 0.3;
       }
     }
     system.points.geometry.attributes.position.needsUpdate = true;
   });
 
+  // 风幕气流 + 运行指示灯 (随开门启停)
+  if (airCurtainSys) {
+    const frac = Math.min(doorTarget.d / DOOR_TRAVEL, 1);
+    mats.airStream.opacity = frac > 0.05 ? 0.3 : 0;
+    if (airCurtainLED) airCurtainLED.material.emissiveIntensity = frac > 0.05 ? 2.2 : 0;
+    if (frac > 0.05) {
+      const arr = airCurtainSys.positions;
+      for (let i = 0; i < airCurtainSys.count; i++) {
+        arr[i * 3 + 1] -= airCurtainSys.vel[i] * delta;
+        if (arr[i * 3 + 1] < 0.1) arr[i * 3 + 1] = 3.5;
+      }
+      airCurtainSys.points.geometry.attributes.position.needsUpdate = true;
+    }
+  }
+
   // 门口冷气瀑布
   if (doorMistSys) {
-    const frac = Math.min(Math.abs(doorTarget.angle) / 1.92, 1);
+    const frac = Math.min(doorTarget.d / DOOR_TRAVEL, 1);
     mats.doorMist.opacity = frac * 0.5;
     if (frac > 0.05) {
       const arr = doorMistSys.positions;
@@ -966,8 +1324,8 @@ function updateAnimations(delta, elapsed) {
 
 function updateMiniMap() {
   const p = controls.getObject().position;
-  const x = THREE.MathUtils.clamp(88 + p.x * 6.2, 8, 172);
-  const y = THREE.MathUtils.clamp(105 - p.z * 6.2, 8, 172);
+  const x = THREE.MathUtils.clamp(90 + p.x * 4.2, 8, 172);
+  const y = THREE.MathUtils.clamp(73 - p.z * 4.2, 8, 172);
   ui.miniPlayer.style.left = `${x}px`;
   ui.miniPlayer.style.top = `${y}px`;
 }
@@ -1003,9 +1361,13 @@ addEventListener("resize", () => {
 addLighting();
 addGround();
 addColdRoom();
+addAnteroom();
 buildDoor();
-[-2.75, 2.75].forEach((x) => [-4.9, -2.45].forEach((z) => addRack(x, z)));
-[-1.7, 0, 1.7].forEach(addFan);
+addAirCurtain();
+[-3.9, 3.9].forEach((x) => [-11.2, -8.75, -5.5, -3.05].forEach((z) => addRack(x, z)));
+addRefrigerantPiping();
+addCeilingServices();
+addUnitCoolers();
 addColdMist();
 addDoorMist();
 addEquipment();

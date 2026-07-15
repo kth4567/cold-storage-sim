@@ -301,12 +301,23 @@ canvas.webgl {
 #miniMap::before {
   content: "";
   position: absolute;
-  left: 58px;
-  top: 74px;
+  left: 61px;
+  top: 51px;
   width: 59px;
-  height: 74px;
+  height: 76px;
   border: 2px solid rgba(230, 240, 255, 0.42);
   box-shadow: inset 0 0 24px rgba(93, 163, 235, 0.14);
+}
+
+#miniMap::after {
+  content: "";
+  position: absolute;
+  left: 69px;
+  top: 31px;
+  width: 42px;
+  height: 21px;
+  border: 2px solid rgba(230, 240, 255, 0.28);
+  border-bottom: none;
 }
 
 #miniPlayer {
@@ -321,9 +332,9 @@ canvas.webgl {
 
 #miniDoor {
   position: absolute;
-  left: 80px;
-  top: 72px;
-  width: 17px;
+  left: 84px;
+  top: 49px;
+  width: 12px;
   height: 3px;
   background: #31d05a;
   transform-origin: right center;

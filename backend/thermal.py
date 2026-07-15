@@ -56,37 +56,43 @@ def enthalpy(t_c: float, w: float) -> float:
 
 
 class ColdRoomSim:
-    """9.5m x 12m x 4.5m 低温冷库 (-18°C 设定)。"""
+    """14m x 18m x 6m 低温冷库 (-18°C 设定)。"""
 
     # ---- 几何与围护结构 ----
-    ROOM_W, ROOM_D, ROOM_H = 9.5, 12.0, 4.5
-    VOLUME = ROOM_W * ROOM_D * ROOM_H                       # 513 m3
-    A_ENV = 2 * ROOM_W * ROOM_D + 2 * (ROOM_W + ROOM_D) * ROOM_H   # 421.5 m2
+    ROOM_W, ROOM_D, ROOM_H = 14.0, 18.0, 6.0
+    VOLUME = ROOM_W * ROOM_D * ROOM_H                       # 1512 m3
+    A_ENV = 2 * ROOM_W * ROOM_D + 2 * (ROOM_W + ROOM_D) * ROOM_H   # 888 m2
     U_ENV = 0.30                # 100mm 聚氨酯板 W/(m2·K)
     DOOR_W, DOOR_H = 2.6, 3.55  # 库门尺寸 m
 
+    # ---- 门区配套 (真实冷库标配) ----
+    ANTE_DT = 7.0               # 穿堂(缓冲间)比室外低 K: 有遮蔽、无日照、与库体换热
+    AIR_CURTAIN_ETA = 0.65      # 风幕机对开门渗透的削减效率 (典型 0.6~0.8)
+    Q_AIR_CURTAIN = 550.0       # 风幕机电功率 W (仅开门时运行)
+    Q_DOOR_HEATER = 300.0       # 门框电加热丝 W (防冻结, 常开)
+
     # ---- 货物 ----
-    M_PRODUCT = 20000.0         # kg 冻品
+    M_PRODUCT = 40000.0         # kg 冻品 (8 组货架)
     CP_PRODUCT = 2000.0         # J/(kg·K) 冻结状态
-    UA_PRODUCT = 1600.0         # 空气-货物换热 W/K
+    UA_PRODUCT = 3000.0         # 空气-货物换热 W/K
 
     # ---- 内部负荷 ----
-    Q_FANS = 1650.0             # 3 台冷风机电机 W (持续送风, 仅化霜停)
-    Q_LIGHTS = 300.0            # 照明 W
+    Q_FANS = 3600.0             # 2 台吊顶冷风机共 6 台风机电机 W (持续送风, 仅化霜停)
+    Q_LIGHTS = 600.0            # 照明 W (6 组灯管)
     Q_COND_FANS = 1500.0        # 2 台冷凝器风机 W (库外, 只计电耗不入热平衡)
 
     # ---- 制冷机组 ----
-    Q_RATED = 26000.0           # 额定制冷量 W (T_in=-18 工况)
+    Q_RATED = 52000.0           # 额定制冷量 W (T_in=-18 工况)
     ETA_CARNOT = 0.45           # 卡诺效率比
     EVAP_APPROACH = 8.0         # 蒸发温度趋近 K
     COND_APPROACH = 12.0        # 冷凝温度趋近 K
     SETPOINT = -18.0
     HYSTERESIS = 1.2            # 温控滞环 ±K
-    COIL_FLOW = 6.5             # 蒸发器风量 m3/s
+    COIL_FLOW = 13.0            # 蒸发器风量 m3/s
 
     # ---- 化霜 ----
     FROST_DEFROST_TRIG = 8.0    # kg 触发化霜
-    DEFROST_POWER = 12000.0     # 电热化霜 W
+    DEFROST_POWER = 18000.0     # 电热化霜 W
     DEFROST_LEAK = 0.30         # 化霜热量泄入库内比例
 
     def __init__(self):
@@ -124,19 +130,23 @@ class ColdRoomSim:
 
     # ------------------------------------------------------------------
     def _door_infiltration(self):
-        """Gosney-Olama 开门空气交换: 返回(显热+潜热 W, 水分 kg/s)。"""
+        """Gosney-Olama 开门空气交换: 返回(显热+潜热 W, 水分 kg/s)。
+
+        库门开向穿堂而非露天: 交换空气取穿堂温度(室外-ANTE_DT);
+        门楣风幕机开门即启, 按 AIR_CURTAIN_ETA 削减渗透。"""
         if self.door_frac <= 0.01:
             return 0.0, 0.0
+        t_amb = self.t_out - self.ANTE_DT          # 穿堂空气温度
         a_open = self.DOOR_W * self.DOOR_H * self.door_frac
         h_eff = self.DOOR_H * max(self.door_frac, 0.35)
         rho_i = air_density(self.t_in)
-        rho_o = air_density(self.t_out)
+        rho_o = air_density(t_amb)
         if rho_i <= rho_o:
             return 0.0, 0.0
-        w_out = humidity_ratio(self.t_out, self.rh_out)
-        dh = enthalpy(self.t_out, w_out) - enthalpy(self.t_in, self.w_in)   # J/kg
-        # 密度差驱动的重力流, 流动因子 Fm≈0.68, 门道阻力 0.8
-        fm = 0.68 * 0.8
+        w_out = humidity_ratio(t_amb, self.rh_out)
+        dh = enthalpy(t_amb, w_out) - enthalpy(self.t_in, self.w_in)   # J/kg
+        # 密度差驱动的重力流, 流动因子 Fm≈0.68, 门道阻力 0.8, 风幕再削减
+        fm = 0.68 * 0.8 * (1.0 - self.AIR_CURTAIN_ETA)
         q = 0.221 * a_open * rho_i * dh * math.sqrt(1.0 - rho_o / rho_i) \
             * math.sqrt(G * h_eff) * fm
         # 对应体积流量 -> 水分迁移
@@ -226,6 +236,11 @@ class ColdRoomSim:
             self.q_cool, self.power, self.cop = 0.0, 0.0, 0.0
             # 停机时盘管缓慢回温至库温 (时间常数 ~3min)
             self.t_evap += (self.t_in - self.t_evap) * min(h / 180.0, 1.0)
+
+        # ---- 门区配套电耗 (加热丝常开, 风幕机随门启停; 热量基本不入库内) ----
+        self.power += self.Q_DOOR_HEATER
+        if self.door_frac > 0.05:
+            self.power += self.Q_AIR_CURTAIN
 
         # ---- 风机/照明 (蒸发器风机持续送风, 仅化霜停; 照明常开) ----
         q_fans = self.Q_FANS if not self.defrosting else 0.0

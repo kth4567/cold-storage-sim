@@ -6,7 +6,8 @@
 (MuJoCo wxyz -> Three.js xyzw)。
 
 动态体:
-  * 库门     铰链关节 + 位置伺服执行器, 有质量/惯量/阻尼, 可被货箱卡住
+  * 库门     电动平移门: 滑移关节 + 位置伺服执行器, 沿前墙向右滑开,
+             有质量/阻尼, 门道内的货箱/玩家可将其卡住(安全触边教学点)
   * 货箱x12  自由刚体, 可推动/抓取/投掷/生成
   * 圆桶x2   圆柱刚体
   * 皮球x1   球体, condim=6 带滚动摩擦
@@ -14,7 +15,7 @@
 
 碰撞位掩码 (rule: (ct1&ca2)|(ct2&ca1)):
   静态 ct=1 ca=0 | 货箱/桶/球 ct=2 ca=15 | 库门 ct=4 ca=10 | 玩家 ct=8 ca=0
-  -> 门不与墙碰撞(门扇与门框视觉上搭接, 物理上由铰链限位约束),
+  -> 门不与墙碰撞(门扇贴墙外滑动, 行程由关节限位约束),
      门与货箱/玩家碰撞(货箱可以卡门), 玩家不与静态墙碰撞(前端处理)。
 """
 
@@ -24,20 +25,22 @@ import random
 import mujoco
 import numpy as np
 
-DOOR_OPEN_ANGLE = 1.92           # rad, 向外开(+z 院子方向), 扫掠区无障碍
+DOOR_TRAVEL = 2.75               # m, 平移门全开行程(向 +x 滑动, 完全让出门洞)
 TIMESTEP = 0.004
 
 # 静态障碍 xz 包围盒 (minX, maxX, minZ, maxZ), 供 spawn 落点校验
 STATIC_AABBS = [
-    (-4.85, -4.65, -7.1, 5.2), (4.65, 4.85, -7.1, 5.2),      # 左右墙
-    (-4.85, 4.85, -7.1, -6.9),                                 # 后墙
-    (-4.85, -1.3, 4.89, 5.11), (1.3, 4.85, 4.89, 5.11),        # 前墙两侧
-    (5.9, 12.8, 3.0, 5.8),                                     # 压缩机平台
-    (7.85, 12.55, -3.45, -1.15),                               # 冷凝器
-] + [(x - 1.65, x + 1.65, z - 0.55, z + 0.55)                  # 货架 4 组
-     for x in (-2.75, 2.75) for z in (-4.9, -2.45)] \
+    (-7.10, -6.90, -13.1, 5.2), (6.90, 7.10, -13.1, 5.2),      # 左右墙
+    (-7.10, 7.10, -13.1, -12.9),                               # 后墙
+    (-7.10, -1.3, 4.89, 5.11), (1.3, 7.10, 4.89, 5.11),        # 前墙两侧
+    (8.3, 15.2, 3.0, 5.8),                                     # 压缩机平台
+    (10.25, 14.95, -3.45, -1.15),                              # 冷凝器
+    (-5.1, -4.9, 5.2, 10.1), (4.9, 5.1, 5.2, 10.1),            # 穿堂左右墙
+    (-5.1, -1.5, 9.9, 10.1), (1.5, 5.1, 9.9, 10.1),            # 穿堂前墙两侧
+] + [(x - 1.65, x + 1.65, z - 0.55, z + 0.55)                  # 货架 8 组
+     for x in (-3.9, 3.9) for z in (-11.2, -8.75, -5.5, -3.05)] \
   + [(x - 0.15, x + 0.15, z - 0.15, z + 0.15)                  # 护柱 4 根
-     for x, z in ((-3.8, 6.2), (3.8, 6.2), (6.2, 5.95), (13.1, 5.95))]
+     for x, z in ((-3.8, 6.2), (3.8, 6.2), (8.6, 5.95), (15.5, 5.95))]
 
 CRATE_COLORS = ["#b88745", "#a8793c", "#c29354", "#9c7038", "#b3824a"]
 
@@ -59,7 +62,7 @@ class ColdRoomWorld:
         self.data = mujoco.MjData(self.model)
         mujoco.mj_forward(self.model, self.data)
 
-        self.door_jnt = self.model.joint("door_hinge")
+        self.door_jnt = self.model.joint("door_slide")
         self.door_act = self.model.actuator("door_servo").id
         self.player_mocap = self.model.body("player").mocapid[0]
         self._body_ids = [self.model.body(b["name"]).id for b in self.bodies]
@@ -96,37 +99,45 @@ class ColdRoomWorld:
         s = []   # 静态几何
         # 地坪
         s.append(_box("floor", (4, -0.15, -1), (19, 0.15, 17), extra='friction="0.8 0.01 0.0001"'))
-        # 冷库围护 (内空 9.5 x 12 x 4.5, 中心 z=-1)
-        s.append(_box("wall_l", (-4.75, 2.25, -1), (0.09, 2.25, 6)))
-        s.append(_box("wall_r", (4.75, 2.25, -1), (0.09, 2.25, 6)))
-        s.append(_box("wall_b", (0, 2.25, -7), (4.75, 2.25, 0.09)))
-        s.append(_box("wall_fl", (-3.025, 2.25, 5), (1.725, 2.25, 0.11)))
-        s.append(_box("wall_fr", (3.025, 2.25, 5), (1.725, 2.25, 0.11)))
-        s.append(_box("header", (0, 4.0, 5), (1.35, 0.5, 0.11)))
-        s.append(_box("ceiling", (0, 4.5, -1), (4.75, 0.09, 6)))
-        # 货架 (4 组近似长方体, 靠后墙两排)
-        for i, x in enumerate((-2.75, 2.75)):
-            for j, z in enumerate((-4.9, -2.45)):
+        # 冷库围护 (内空 14 x 18 x 6, 前墙 z=5, 中心 z=-4)
+        s.append(_box("wall_l", (-7.0, 3.0, -4), (0.09, 3.0, 9)))
+        s.append(_box("wall_r", (7.0, 3.0, -4), (0.09, 3.0, 9)))
+        s.append(_box("wall_b", (0, 3.0, -13), (7.0, 3.0, 0.09)))
+        s.append(_box("wall_fl", (-4.15, 3.0, 5), (2.85, 3.0, 0.11)))
+        s.append(_box("wall_fr", (4.15, 3.0, 5), (2.85, 3.0, 0.11)))
+        s.append(_box("header", (0, 4.75, 5), (1.35, 1.25, 0.11)))
+        s.append(_box("ceiling", (0, 6.0, -4), (7.0, 0.09, 9)))
+        # 收发货穿堂 (缓冲间, 外口 3m 宽挂软帘无门)
+        s.append(_box("ante_l", (-5, 2.1, 7.6), (0.075, 2.1, 2.4)))
+        s.append(_box("ante_r", (5, 2.1, 7.6), (0.075, 2.1, 2.4)))
+        s.append(_box("ante_f1", (-3.25, 2.1, 10), (1.75, 2.1, 0.075)))
+        s.append(_box("ante_f2", (3.25, 2.1, 10), (1.75, 2.1, 0.075)))
+        s.append(_box("ante_hd", (0, 3.7, 10), (1.5, 0.5, 0.075)))
+        s.append(_box("ante_roof", (0, 4.28, 7.55), (5.15, 0.08, 2.55)))
+        # 货架 (8 组近似长方体, 两列四排、两两背靠背)
+        for i, x in enumerate((-3.9, 3.9)):
+            for j, z in enumerate((-11.2, -8.75, -5.5, -3.05)):
                 s.append(_box(f"rack_{i}{j}", (x, 1.6, z), (1.65, 1.6, 0.55)))
         # 设备平台与机组
-        s.append(_box("platform", (9.4, 0.28, 4.4), (3.5, 0.175, 1.3)))
-        s.append(_box("equip_a", (9.35, 1.1, 4.4), (3.45, 1.1, 1.4)))
-        s.append(_box("equip_b", (10.2, 2.0, -2.3), (2.35, 2.0, 1.15)))
+        s.append(_box("platform", (11.8, 0.28, 4.4), (3.5, 0.175, 1.3)))
+        s.append(_box("equip_a", (11.75, 1.1, 4.4), (3.45, 1.1, 1.4)))
+        s.append(_box("equip_b", (12.6, 2.0, -2.3), (2.35, 2.0, 1.15)))
         # 安全护柱 (与前端视觉一致, 货箱/皮球可撞)
-        for k, (bx, bz) in enumerate(((-3.8, 6.2), (3.8, 6.2), (6.2, 5.95), (13.1, 5.95))):
+        for k, (bx, bz) in enumerate(((-3.8, 6.2), (3.8, 6.2), (8.6, 5.95), (15.5, 5.95))):
             s.append(f'<geom name="bollard_{k}" type="cylinder" pos="{bx} 0.62 {bz}" '
                      f'size="0.13 0.625" euler="1.5708 0 0"/>')
         # 隐藏停放层 (备用货箱)
         s.append(_box("park_slab", (-10, -4.5, -10), (9, 0.1, 4)))
 
         d = []   # 动态体
-        # 库门: 铰链在 x=1.35, 门扇覆盖 x -1.35..1.35, 高 3.55
+        # 电动平移门: 门扇 2.9x3.7, 贴前墙外侧滑动, 关闭时覆盖门洞 x -1.45..1.45,
+        # 向 +x 滑开 DOOR_TRAVEL 后完全让出门洞
         d.append(
-            '<body name="door" pos="1.35 0 5.15">'
-            '<joint name="door_hinge" type="hinge" axis="0 1 0" pos="0 0 0" '
-            'range="-0.02 1.95" damping="90" frictionloss="4" limited="true"/>'
-            '<geom name="door_slab" type="box" pos="-1.35 1.775 0" '
-            'size="1.35 1.775 0.11" mass="95" friction="0.4 0.005 0.0001" '
+            '<body name="door" pos="0 0 5.24">'
+            f'<joint name="door_slide" type="slide" axis="1 0 0" '
+            f'range="-0.01 {DOOR_TRAVEL + 0.01}" damping="2500" frictionloss="60" limited="true"/>'
+            '<geom name="door_slab" type="box" pos="0 1.85 0" '
+            'size="1.45 1.85 0.075" mass="240" friction="0.4 0.005 0.0001" '
             'contype="4" conaffinity="10"/>'
             "</body>")
         # 货箱: 门内堆垛 + 巷道散放 + 库外
@@ -152,12 +163,12 @@ class ColdRoomWorld:
                                     color=CRATE_COLORS[i % len(CRATE_COLORS)], pool=True))
             self.pool_ids.append(name)
         # 圆桶
-        d.append(self._dyn_body("barrel_0", "cylinder", (5.25, 0.43, 6.20),
+        d.append(self._dyn_body("barrel_0", "cylinder", (5.90, 0.43, 8.60),
                                 [0.28, 0.84], mass=26, color="#2565a8"))
         d.append(self._dyn_body("barrel_1", "cylinder", (12.40, 0.43, 6.60),
                                 [0.28, 0.84], mass=26, color="#a83a25"))
         # 皮球
-        d.append(self._dyn_body("ball_0", "sphere", (0.0, 0.26, -6.05),
+        d.append(self._dyn_body("ball_0", "sphere", (0.5, 0.26, -7.1),
                                 [0.24], mass=3.5, color="#d8452e",
                                 friction="0.6 0.008 0.0003", condim=6))
 
@@ -171,13 +182,13 @@ class ColdRoomWorld:
   <worldbody>
     {''.join(s)}
     {''.join(d)}
-    <body name="player" mocap="true" pos="0 0.95 10.5">
+    <body name="player" mocap="true" pos="0 0.95 13">
       <geom name="player_geom" type="sphere" size="0.35" contype="8" conaffinity="0"/>
     </body>
   </worldbody>
   <actuator>
-    <position name="door_servo" joint="door_hinge" kp="550" kv="40"
-              forcerange="-2200 2200" ctrlrange="-0.02 1.95"/>
+    <position name="door_servo" joint="door_slide" kp="3000" kv="500"
+              forcerange="-2800 2800" ctrlrange="-0.01 {DOOR_TRAVEL + 0.01}"/>
   </actuator>
 </mujoco>"""
 
@@ -187,12 +198,13 @@ class ColdRoomWorld:
                  "color": b["color"], "pool": b["pool"]} for b in self.bodies]
 
     @property
-    def door_angle(self) -> float:
+    def door_pos(self) -> float:
+        """平移门滑开位移 m (0=关闭)。"""
         return float(self.data.qpos[self.door_jnt.qposadr[0]])
 
     @property
     def door_frac(self) -> float:
-        return min(abs(self.door_angle) / abs(DOOR_OPEN_ANGLE), 1.0)
+        return min(abs(self.door_pos) / DOOR_TRAVEL, 1.0)
 
     # ------------------------------------------------------------------
     def set_player(self, pos):
@@ -202,7 +214,7 @@ class ColdRoomWorld:
 
     def toggle_door(self):
         self.door_target_open = not self.door_target_open
-        self.data.ctrl[self.door_act] = DOOR_OPEN_ANGLE if self.door_target_open else 0.0
+        self.data.ctrl[self.door_act] = DOOR_TRAVEL if self.door_target_open else 0.0
         return self.door_target_open
 
     def _body_pos(self, name):
@@ -276,7 +288,7 @@ class ColdRoomWorld:
             p = cam + d * t
             if blocked(p[0], p[2], 0.05):           # 视线被挡, 更远处不可达
                 break
-            if not (-14 < p[0] < 22 and -16 < p[2] < 15):
+            if not (-16 < p[0] < 24 and -16 < p[2] < 15):
                 break
             if t >= 0.6 and not blocked(p[0], p[2], 0.45):
                 best = p.copy()
@@ -345,5 +357,5 @@ class ColdRoomWorld:
             out.append([round(float(p[0]), 4), round(float(p[1]), 4), round(float(p[2]), 4),
                         round(float(q[1]), 5), round(float(q[2]), 5),
                         round(float(q[3]), 5), round(float(q[0]), 5)])
-        return {"b": out, "door": round(self.door_angle, 4),
+        return {"b": out, "door": round(self.door_pos, 4),
                 "held": self.held, "doorOpen": self.door_target_open}
