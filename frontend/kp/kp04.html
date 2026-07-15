@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./kp.css" />
+</head>
+<body data-kp="KP04">
+  <div class="kp-wrap" id="wrap">
+
+    <div class="panel viz-box">
+      <h3>库门表面的浮升空气流 <small>流动完全由温差"长"出来——没有风机,没有外力</small></h3>
+      <canvas id="flowCanvas" width="960" height="420"></canvas>
+      <div class="hintline">💡 <b>核心体验</b>:调大温差,门面空气沉得更急、边界层薄膜更薄、h 蹿上去;把温差归零,空气瞬间静止。切"开门",看冷气从下涌出、热气从上灌入。</div>
+    </div>
+
+    <div class="kp-grid main-side">
+      <div class="panel viz-box">
+        <h3>Nu = C·Ra<sup>n</sup> 关联式 <small>log-log 坐标,Ra≈10⁹ 层/湍流分界</small></h3>
+        <svg id="nuSvg" viewBox="0 0 720 300" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+
+      <div class="panel">
+        <h3>控制与仪表</h3>
+        <div class="ctl-row">
+          <label>门表面温度 T<sub>s</sub></label>
+          <input type="range" id="ts" min="-25" max="40" step="0.5" value="5" />
+          <output id="tsOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>室内空气 T<sub>∞</sub></label>
+          <input type="range" id="ta" min="-10" max="40" step="0.5" value="25" />
+          <output id="taOut" class="hot"></output>
+        </div>
+        <div class="ctl-row">
+          <label>门高 L</label>
+          <input type="range" id="len" min="0.5" max="4" step="0.1" value="2" class="mono-track" />
+          <output id="lenOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>室内湿度</label>
+          <input type="range" id="rh" min="30" max="95" step="1" value="60" class="mono-track" />
+          <output id="rhOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>门洞状态</label>
+          <button class="kbtn" id="doorBtn">🚪 开门看看</button>
+        </div>
+        <div class="cards" style="margin-top:12px">
+          <div class="card"><div class="lbl">Ra 数</div><div class="val" id="vRa" style="font-size:17px">--</div></div>
+          <div class="card"><div class="lbl">Nu 数</div><div class="val" id="vNu">--</div></div>
+          <div class="card hot"><div class="lbl">h 表面换热系数</div><div class="val" id="vH">--<small>W/m²K</small></div></div>
+          <div class="card hot"><div class="lbl">q = h·ΔT</div><div class="val" id="vQ">--<small>W/m²</small></div></div>
+          <div class="card" id="flowCard"><div class="lbl">流态</div>
+            <div class="val" style="font-size:15px"><span class="dot" id="flowDot"></span><span id="flowTxt">--</span></div></div>
+          <div class="card" id="dewCard4"><div class="lbl">门面结露校核</div>
+            <div class="val" style="font-size:14px"><span class="dot ok" id="dewDot"></span><span id="dewTxt">--</span></div></div>
+        </div>
+        <div class="formula cold-side">Ra = Gr·Pr = gβΔT·L³/ν² · Pr</div>
+        <div class="formula">Nu = 0.59·Ra<sup>1/4</sup> (层流) / 0.10·Ra<sup>1/3</sup> (湍流) → h = Nu·λ/L</div>
+      </div>
+    </div>
+
+    <details class="knowledge">
+      <summary>知识速览 —— 自然对流</summary>
+      <div class="kbody">
+        <h4>物理图景</h4>
+        <p>门面比空气冷 → 贴壁空气被冷却变重 → 沿门面下沉,形成一层薄薄的边界层"空气瀑布"。
+          没有任何外力,流动全靠温差→密度差→浮升力自发驱动;温差消失,流动即停。换热的阻力几乎全部集中在这层薄膜里。</p>
+        <h4>核心链条</h4>
+        <p>浮升判据用 Gr = gβΔTL³/ν²(β=1/T<sub>f</sub>,膜温取开尔文),Ra = Gr·Pr;
+          竖壁关联式 Nu = 0.59Ra<sup>1/4</sup>(层流,Ra&lt;10⁹)或 0.10Ra<sup>1/3</sup>(湍流);h = Nuλ/L,q = hΔT。</p>
+        <h4>典型数值(本页默认参数即此例)</h4>
+        <p>L=2m、T<sub>s</sub>=5℃、T<sub>∞</sub>=25℃:Gr=2.42×10¹⁰,Ra=1.72×10¹⁰(&gt;10⁹ 湍流),Nu=257,
+          h≈<b>3.35 W/(m²·K)</b>——落在气体自然对流 3~8 的经验区间。</p>
+        <h4>常见误区</h4>
+        <p class="trap">自然对流也要风机?——无外力,全靠浮升力;有风机就成了 KP06 强制对流。</p>
+        <p class="trap">用 Re 判自然对流?——自然对流看 Gr/Ra,强制对流才看 Re。</p>
+        <p class="trap">β 随便取?——理想气体 β=1/T,T 必须用膜温(开尔文)。</p>
+        <p class="trap">门面"漏水"?——那是水蒸气在冷表面凝结,解决之道是防凝露电加热。</p>
+        <h4>与其他知识点</h4>
+        <p>h 回传 KP01 作为门体表面热阻;开门时门洞冷热对冲是渗透负荷主因,风幕(KP06 强制对流)就是用来对抗它的。</p>
+      </div>
+    </details>
+  </div>
+
+  <script type="module">
+    import { initPage, svgEl, $, fmt, clamp, scale, tempColor, bindSlider } from "./kp-common.js";
+    initPage();
+
+    const state = { Ts: 5, Ta: 25, L: 2, rh: 60, open: false };
+    const NU_AIR = 1.5e-5, LAM = 0.026, PR = 0.71, G = 9.81;
+
+    function physics() {
+      const Tf = (state.Ts + state.Ta) / 2 + 273.15;
+      const dT = Math.abs(state.Ts - state.Ta);
+      const beta = 1 / Tf;
+      const Gr = G * beta * dT * state.L ** 3 / NU_AIR ** 2;
+      const Ra = Gr * PR;
+      const turb = Ra >= 1e9;
+      const Nu = dT < 1e-6 ? 0 : (turb ? 0.10 * Math.cbrt(Ra) : 0.59 * Math.pow(Ra, 0.25));
+      const h = Nu * LAM / state.L;
+      const q = h * dT;
+      const vChar = Math.sqrt(G * beta * dT * state.L);          // 特征浮升速度
+      // 露点 (Magnus, 室内空气)
+      const a = 17.62, b = 243.12;
+      const g2 = Math.log(state.rh / 100) + (a * state.Ta) / (b + state.Ta);
+      const dew = (b * g2) / (a - g2);
+      return { dT, Gr, Ra, Nu, h, q, vChar, turb, dew, down: state.Ts < state.Ta };
+    }
+
+    // ---------------- 粒子流场 ----------------
+    const cv = $("#flowCanvas"), ctx = cv.getContext("2d");
+    const W = 960, H = 420;
+    const DOOR_X = 450, DOOR_W = 26;
+
+    // 粒子: 沿门面 (关门态) 或穿门洞 (开门态)
+    const N = 260;
+    const parts = Array.from({ length: N }, (_, i) => ({
+      y: Math.random(), d: Math.random(), ph: i * 0.618, side: Math.random() < 0.5 ? 1 : -1,
+    }));
+
+    function doorRect(p) {
+      const hpx = clamp(state.L * 90, 60, 340);
+      const y0 = (H - hpx) / 2 + 14;
+      const x = DOOR_X + (state.open ? -120 : 0);
+      return { x, y0, hpx };
+    }
+
+    function draw(p, dtSec) {
+      ctx.clearRect(0, 0, W, H);
+      const { x: dx, y0, hpx } = doorRect();
+
+      // 两侧空间
+      ctx.fillStyle = "rgba(16,32,54,0.85)";
+      ctx.fillRect(0, 0, DOOR_X - 40, H);
+      ctx.fillStyle = "rgba(66,32,14,0.28)";
+      ctx.fillRect(DOOR_X + DOOR_W + 40, 0, W, H);
+      ctx.font = "14px 'Microsoft YaHei'";
+      ctx.fillStyle = "#9fd4ff";
+      ctx.fillText(`库内 −18℃`, 40, 40);
+      ctx.fillStyle = "#ffb28a";
+      ctx.fillText(`室内(穿堂) ${state.Ta}℃`, W - 200, 40);
+
+      // 门框
+      ctx.fillStyle = "#39434d";
+      ctx.fillRect(DOOR_X - 8, y0 - 14, DOOR_W + 16, 8);
+      ctx.fillRect(DOOR_X - 8, y0 + hpx + 6, DOOR_W + 16, 8);
+
+      // 门板 (开门态左移)
+      ctx.fillStyle = tempColor(state.Ts, -30, 45);
+      ctx.fillRect(dx, y0, DOOR_W, hpx);
+      ctx.strokeStyle = "rgba(220,235,255,0.5)";
+      ctx.strokeRect(dx, y0, DOOR_W, hpx);
+      ctx.save();
+      ctx.translate(dx + DOOR_W / 2 + 1, y0 + hpx / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = "rgba(10,18,28,0.9)";
+      ctx.font = "12px 'Microsoft YaHei'";
+      ctx.textAlign = "center";
+      ctx.fillText(`门板表面 ${state.Ts}℃ · 高 ${state.L}m`, 0, 4);
+      ctx.restore();
+      ctx.textAlign = "left";
+
+      // 结露水珠
+      if (state.Ts < p.dew && !state.open) {
+        ctx.fillStyle = "rgba(150,210,255,0.8)";
+        for (let i = 0; i < 14; i++) {
+          const wy = y0 + ((i * 79.7) % hpx), wx = DOOR_X + DOOR_W + 3 + ((i * 37) % 6);
+          ctx.beginPath(); ctx.arc(wx, wy, 2.2, 0, 7); ctx.fill();
+        }
+      }
+
+      if (!state.open) {
+        // 边界层薄膜 (右侧暖空气贴冷门面): 厚度 ∝ L/Nu
+        const dlt = p.Nu > 0 ? clamp((state.L / p.Nu) * 9000, 10, 110) : 130;
+        const grd = ctx.createLinearGradient(DOOR_X + DOOR_W, 0, DOOR_X + DOOR_W + dlt, 0);
+        grd.addColorStop(0, "rgba(110,190,255,0.30)");
+        grd.addColorStop(1, "rgba(110,190,255,0)");
+        ctx.fillStyle = grd;
+        ctx.fillRect(DOOR_X + DOOR_W, y0, dlt, hpx);
+        ctx.strokeStyle = "rgba(140,200,255,0.35)";
+        ctx.setLineDash([4, 5]);
+        ctx.beginPath();
+        ctx.moveTo(DOOR_X + DOOR_W + dlt, y0);
+        ctx.lineTo(DOOR_X + DOOR_W + dlt, y0 + hpx);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(160,215,255,0.75)";
+        ctx.font = "11px Consolas";
+        ctx.fillText(`边界层 δ~${fmt(state.L / Math.max(p.Nu, 1) * 1000, 1)}mm`, DOOR_X + DOOR_W + dlt + 6, y0 + 16);
+
+        // 粒子: 膜内速度分布 v(d) ∝ (d/δ)(1-d/δ)², 冷面下沉
+        const vpx = p.vChar * 110;                     // px/s
+        parts.forEach((pt) => {
+          const dpx = pt.d * dlt;
+          const u = pt.d, prof = 6.75 * u * (1 - u) * (1 - u);   // 峰值≈1
+          if (p.dT > 0.01) pt.y += (p.down ? 1 : -1) * (vpx * prof * dtSec) / hpx;
+          if (pt.y > 1.02) pt.y = -0.02;
+          if (pt.y < -0.02) pt.y = 1.02;
+          const px = DOOR_X + DOOR_W + 2 + dpx;
+          const py = y0 + pt.y * hpx;
+          ctx.fillStyle = `rgba(190,230,255,${0.25 + prof * 0.55})`;
+          ctx.beginPath();
+          ctx.arc(px, py, 1.6 + prof, 0, 7);
+          ctx.fill();
+          // 拖尾
+          ctx.strokeStyle = `rgba(150,210,255,${0.12 + prof * 0.3})`;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px, py - (p.down ? 1 : -1) * (5 + prof * 10));
+          ctx.stroke();
+        });
+        if (p.dT < 0.01) {
+          ctx.fillStyle = "rgba(230,240,255,0.75)";
+          ctx.font = "15px 'Microsoft YaHei'";
+          ctx.fillText("ΔT = 0 → 浮升力消失,空气静止", DOOR_X - 110, y0 - 26);
+        }
+      } else {
+        // 开门态: 门洞双层对冲流
+        parts.forEach((pt) => {
+          const upper = pt.side > 0;
+          const py = y0 + (upper ? 0.12 + pt.d * 0.34 : 0.55 + pt.d * 0.34) * hpx;
+          pt.y += (upper ? -1 : 1) * dtSec * 0.35;     // 上层向左(涌入), 下层向右(涌出)
+          if (pt.y > 1.1) pt.y = -0.1;
+          if (pt.y < -0.1) pt.y = 1.1;
+          const px = DOOR_X - 160 + ((upper ? 1 - pt.y : pt.y) * 480 + pt.ph * 37) % 480;
+          ctx.fillStyle = upper ? "rgba(255,170,110,0.6)" : "rgba(140,215,255,0.65)";
+          ctx.beginPath(); ctx.arc(px, py + Math.sin(pt.ph + pt.y * 9) * 4, 2.2, 0, 7); ctx.fill();
+        });
+        ctx.font = "13px 'Microsoft YaHei'";
+        ctx.fillStyle = "#ffb28a";
+        ctx.fillText("热湿空气从上方灌入 →", DOOR_X - 240, y0 + hpx * 0.22);
+        ctx.fillStyle = "#9fd4ff";
+        ctx.fillText("← 冷空气从下方涌出", DOOR_X + DOOR_W + 60, y0 + hpx * 0.8);
+        ctx.fillStyle = "rgba(255,200,150,0.9)";
+        ctx.fillText("门洞冷热对冲 = 渗透负荷主因,漏热远超关门态 —— 风幕/门帘就是为它而生 (见 KP06)", 170, H - 22);
+      }
+    }
+
+    // ---------------- Nu-Ra 曲线 (log-log) ----------------
+    const nuSvg = $("#nuSvg");
+    function drawNuRa(p) {
+      nuSvg.innerHTML = "";
+      const X = scale([4, 14], [70, 690]);                  // log10 Ra
+      const Y = scale([0.5, 3.6], [252, 28]);               // log10 Nu
+      svgEl("line", { x1: 70, y1: 252, x2: 690, y2: 252, stroke: "#39516d" }, nuSvg);
+      svgEl("line", { x1: 70, y1: 252, x2: 70, y2: 24, stroke: "#39516d" }, nuSvg);
+      for (let e = 4; e <= 14; e += 2) {
+        svgEl("text", { x: X(e), y: 270, "text-anchor": "middle", class: "svg-note", text: `10${sup(e)}` }, nuSvg);
+      }
+      [1, 2, 3].forEach((e) => svgEl("text", { x: 48, y: Y(e) + 4, class: "svg-note", text: `10${sup(e)}` }, nuSvg));
+      svgEl("text", { x: 660, y: 288, class: "svg-note", text: "Ra" }, nuSvg);
+      svgEl("text", { x: 76, y: 18, class: "svg-note", text: "Nu" }, nuSvg);
+      // 分界
+      svgEl("line", { x1: X(9), y1: 252, x2: X(9), y2: 28, stroke: "rgba(255,179,107,0.35)", "stroke-dasharray": "5 5" }, nuSvg);
+      svgEl("text", { x: X(9), y: 44, "text-anchor": "middle", class: "svg-note", fill: "#ffcf9e", text: "Ra=10⁹ 层/湍流分界" }, nuSvg);
+      // 两分支
+      let d1 = "", d2 = "";
+      for (let e = 4; e <= 9; e += 0.1) d1 += (d1 ? "L" : "M") + X(e) + "," + Y(Math.log10(0.59) + 0.25 * e);
+      for (let e = 9; e <= 14; e += 0.1) d2 += (d2 ? "L" : "M") + X(e) + "," + Y(Math.log10(0.10) + e / 3);
+      svgEl("path", { d: d1, fill: "none", stroke: "#53c1ff", "stroke-width": 2.5 }, nuSvg);
+      svgEl("path", { d: d2, fill: "none", stroke: "#ff9a5c", "stroke-width": 2.5 }, nuSvg);
+      svgEl("text", { x: X(6.4), y: Y(Math.log10(0.59) + 0.25 * 6.4) - 12, class: "svg-note", fill: "#9fd4ff", text: "层流 0.59·Ra¹ᐟ⁴" }, nuSvg);
+      svgEl("text", { x: X(11.2), y: Y(Math.log10(0.10) + 11.2 / 3) - 12, class: "svg-note", fill: "#ffcf9e", text: "湍流 0.10·Ra¹ᐟ³" }, nuSvg);
+      // 工作点
+      if (p.Ra > 1e4 && p.Nu > 0) {
+        const ex = clamp(Math.log10(p.Ra), 4, 14), ey = Math.log10(p.Nu);
+        svgEl("circle", { cx: X(ex), cy: Y(ey), r: 6.5, fill: "#ffe6cd", stroke: "#e0561f", "stroke-width": 2 }, nuSvg);
+        svgEl("text", { x: X(ex) + 10, y: Y(ey) + 16, class: "svg-note", fill: "#ffd9b8",
+          text: `工作点 Ra=${expFmt(p.Ra)} → Nu=${fmt(p.Nu, 0)}` }, nuSvg);
+      }
+    }
+
+    const SUPS = { 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
+    const sup = (n) => String(n).split("").map((c) => SUPS[c] || c).join("");
+    const expFmt = (v) => {
+      const e = Math.floor(Math.log10(v));
+      return `${fmt(v / 10 ** e, 2)}×10${sup(e)}`;
+    };
+
+    // ---------------- 仪表 ----------------
+    function renderMetrics(p) {
+      $("#vRa").textContent = p.Ra > 1 ? expFmt(p.Ra) : "0";
+      $("#vNu").textContent = fmt(p.Nu, 0);
+      $("#vH").innerHTML = `${fmt(p.h, 2)}<small>W/m²K</small>`;
+      $("#vQ").innerHTML = `${fmt(p.q, 1)}<small>W/m²</small>`;
+      $("#flowDot").className = "dot " + (p.dT < 0.01 ? "" : "on");
+      $("#flowDot").style.background = p.dT < 0.01 ? "#56636f" : (p.turb ? "#ff9a5c" : "#53c1ff");
+      $("#flowDot").style.boxShadow = p.dT < 0.01 ? "none" : `0 0 11px ${p.turb ? "#ff9a5c" : "#53c1ff"}`;
+      $("#flowTxt").textContent = p.dT < 0.01 ? "静止(无温差)" : (p.turb ? "湍流 (Ra>10⁹)" : "层流 (Ra<10⁹)");
+      const bad = state.Ts < p.dew;
+      $("#dewDot").className = "dot " + (bad ? "on" : "ok");
+      $("#dewTxt").textContent = bad
+        ? `门面 ${state.Ts}℃ < 露点 ${fmt(p.dew, 1)}℃,凝露!需电加热`
+        : `门面 ${state.Ts}℃ ≥ 露点 ${fmt(p.dew, 1)}℃,干燥`;
+      $("#dewCard4").className = "card " + (bad ? "warn" : "ok");
+    }
+
+    function refresh() {
+      const p = physics();
+      drawNuRa(p);
+      renderMetrics(p);
+      return p;
+    }
+
+    bindSlider("#ts", "#tsOut", (v) => `${v} ℃`, (v) => { state.Ts = v; refresh(); });
+    bindSlider("#ta", "#taOut", (v) => `${v} ℃`, (v) => { state.Ta = v; refresh(); });
+    bindSlider("#len", "#lenOut", (v) => `${fmt(v, 1)} m`, (v) => { state.L = v; refresh(); });
+    bindSlider("#rh", "#rhOut", (v) => `${v} %`, (v) => { state.rh = v; refresh(); });
+    $("#doorBtn").addEventListener("click", () => {
+      state.open = !state.open;
+      $("#doorBtn").textContent = state.open ? "🚪 关门回到自然对流" : "🚪 开门看看";
+      $("#doorBtn").classList.toggle("on", state.open);
+    });
+
+    let cur = refresh();
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      cur = physics();
+      draw(cur, dt);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

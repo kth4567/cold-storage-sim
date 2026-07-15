@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./kp.css" />
+  <style>
+    .knob-wrap { display: flex; align-items: center; gap: 18px; }
+    #knobSvg { width: 150px; height: 150px; cursor: grab; flex: 0 0 150px; }
+    #knobSvg.dragging { cursor: grabbing; }
+  </style>
+</head>
+<body data-kp="KP06">
+  <div class="kp-wrap" id="wrap">
+
+    <div class="panel viz-box">
+      <h3>水平掠管流场 <small>风机在左,冷风横向掠过盘管束——与 KP04 的"竖直浮升"形成正反对照</small></h3>
+      <canvas id="flowCanvas" width="960" height="380"></canvas>
+      <div class="hintline">💡 <b>核心体验</b>:拧大旋钮,流线加密、管壁边界层变薄、h 按 v<sup>0.6</sup> 上升;但风机功率按 v³ 猛涨——收益是幂函数,代价是立方,最优风速就在两条曲线之间。</div>
+    </div>
+
+    <div class="kp-grid main-side">
+      <div class="panel">
+        <h3>风机转速旋钮 <small>本页唯一的"动力源"</small></h3>
+        <div class="knob-wrap">
+          <svg id="knobSvg" viewBox="0 0 150 150"></svg>
+          <div style="flex:1">
+            <div class="cards" style="flex-direction:column">
+              <div class="card"><div class="lbl">迎面风速 v</div><div class="val" id="vV">--<small>m/s</small></div></div>
+              <div class="card" id="regimeCard"><div class="lbl">主导机制 Gr/Re²</div>
+                <div class="val" style="font-size:14.5px"><span class="dot" id="regDot"></span><span id="regTxt">--</span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="ctl-row" style="margin-top:10px">
+          <label>微调</label>
+          <input type="range" id="vSlider" min="0" max="8" step="0.05" value="3" class="mono-track" />
+          <output id="vSliderOut"></output>
+        </div>
+        <div class="cards" style="margin-top:10px">
+          <div class="card"><div class="lbl">Re = vD/ν</div><div class="val" id="vRe">--</div></div>
+          <div class="card"><div class="lbl">Nu = 0.26Re⁰·⁶Pr⁰·³⁷</div><div class="val" id="vNu">--</div></div>
+          <div class="card hot"><div class="lbl">h = Nu·λ/D</div><div class="val" id="vH">--<small>W/m²K</small></div></div>
+          <div class="card warn"><div class="lbl">风机功率 ∝ v³</div><div class="val" id="vP">--<small>kW</small></div></div>
+          <div class="card"><div class="lbl">货物干耗指数 ∝ h</div><div class="val" id="vDry">--<small>%</small></div></div>
+        </div>
+        <div class="formula cold-side">h ∼ v⁰·⁶ (收益,幂函数增长放缓)</div>
+        <div class="formula">P<sub>fan</sub> ∼ v³ (代价,立方飙升) + 电机发热全部进库!</div>
+      </div>
+
+      <div class="panel viz-box">
+        <h3>收益 vs 代价 <small>换热量、风机功率与净收益,最优点自己浮现</small></h3>
+        <svg id="curveSvg" viewBox="0 0 640 420" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+    </div>
+
+    <details class="knowledge">
+      <summary>知识速览 —— 强制对流</summary>
+      <div class="kbody">
+        <h4>物理图景</h4>
+        <p>风机用机械功把空气推过盘管表面:流速越高,边界层越薄,换热越强。与自然对流的本质区别是驱动力——
+          这里是外力(风机),判据用 <b>Re</b> 而不是 Gr;比值 Gr/Re²≪1 时强制对流完全压倒自然对流。</p>
+        <h4>核心公式</h4>
+        <p>Re = vD/ν → Nu = C·Re<sup>m</sup>Pr<sup>n</sup>(外掠单管 0.26Re⁰·⁶Pr⁰·³⁷)→ h = Nu·λ/D。
+          h 随风速约 0.5~0.8 次幂增长——<b>非线性,增速递减</b>;而风机功率按 v³ 飙升,且电机发热全部成为库内热负荷。</p>
+        <h4>典型数值(本页默认参数即此例)</h4>
+        <p>v=3 m/s、D=12mm:Re=2769,Nu=26.6,h≈<b>53.3 W/(m²·K)</b>;风速翻倍到 6 m/s,h 只增大 2⁰·⁶=1.52 倍(≈81),
+          功率却是 8 倍。对比 KP04 自然对流 h≈3.35——强制对流高一个数量级,这就是风机存在的意义。</p>
+        <h4>常见误区</h4>
+        <p class="trap">风速越高越好?——能耗∼v³、干耗加剧、电机内热,存在最优风速。</p>
+        <p class="trap">h 与风速成正比?——是 v 的 0.5~0.8 次幂,增益递减。</p>
+        <p class="trap">用 Gr 判强制对流?——看 Re;Gr/Re² 才是两种对流的裁判。</p>
+        <h4>与其他知识点</h4>
+        <p>h<sub>o</sub> 回传 KP05 决定蒸发器 U;吹向货物表面的换热接 KP08;风机关闭后浮升力接管,回到 KP04。</p>
+      </div>
+    </details>
+  </div>
+
+  <script type="module">
+    import { initPage, svgEl, $, fmt, clamp, scale, bindSlider } from "./kp-common.js";
+    initPage();
+
+    const state = { v: 3 };
+    const D = 0.012, NU_A = 1.3e-5, LAM = 0.024, PR = 0.71;
+    const H_REF = () => hOf(3);
+
+    function hOf(v) {
+      if (v < 0.01) return 0;
+      const Re = v * D / NU_A;
+      const Nu = 0.26 * Math.pow(Re, 0.6) * Math.pow(PR, 0.37);
+      return Nu * LAM / D;
+    }
+
+    function physics() {
+      const v = state.v;
+      const Re = v * D / NU_A;
+      const Nu = v < 0.01 ? 0 : 0.26 * Math.pow(Re, 0.6) * Math.pow(PR, 0.37);
+      const h = Nu * LAM / D;
+      const P = 0.75 * Math.pow(v / 3, 3);                    // kW, 3m/s 时 0.75kW
+      const Q = 0.1876 * h;                                   // kW, 标定 3m/s→10kW
+      const net = Q - P;
+      const Gr = 9.81 * (1 / 255) * 8 * D ** 3 / NU_A ** 2;   // ΔT=8K, 膜温 255K
+      const grre2 = Re > 1 ? Gr / (Re * Re) : Infinity;
+      return { v, Re, Nu, h, P, Q, net, grre2 };
+    }
+
+    // ---------------- 掠管流场 (势流绕圆柱) ----------------
+    const cv = $("#flowCanvas"), ctx = cv.getContext("2d");
+    const W = 960, H = 380;
+    const TUBES = [];
+    for (let c = 0; c < 4; c++) {
+      for (let r = 0; r < 3; r++) {
+        TUBES.push({ x: 430 + c * 120, y: 88 + r * 100 + (c % 2) * 50, R: 26 });
+      }
+    }
+
+    const N = 320;
+    const parts = Array.from({ length: N }, () => ({
+      x: Math.random() * W, y: 20 + Math.random() * (H - 40),
+    }));
+
+    function velAt(x, y, U) {
+      // 均匀流 + 各管双极子扰动 (圆柱绕流)
+      let u = U, v = 0;
+      for (const t of TUBES) {
+        const dx = x - t.x, dy = y - t.y;
+        const r2 = dx * dx + dy * dy;
+        if (r2 < t.R * t.R * 0.86) return { u: 0, v: 0, inside: true };
+        const k = U * t.R * t.R / (r2 * r2);
+        u += k * (dy * dy - dx * dx);
+        v += -k * 2 * dx * dy;
+      }
+      return { u, v, inside: false };
+    }
+
+    let fanAngle = 0;
+    function drawField(p, dt) {
+      ctx.clearRect(0, 0, W, H);
+      // 背景风道
+      ctx.fillStyle = "rgba(12,20,34,0.9)";
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = "rgba(120,170,230,0.18)";
+      ctx.strokeRect(4, 8, W - 8, H - 16);
+
+      // 风机 (左侧, 转速∝v)
+      fanAngle += dt * p.v * 3.2;
+      ctx.save();
+      ctx.translate(80, H / 2);
+      ctx.strokeStyle = "#5c6873";
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(0, 0, 62, 0, 7); ctx.stroke();
+      ctx.rotate(fanAngle);
+      ctx.fillStyle = p.v > 0.05 ? "#7fb8e8" : "#4a5866";
+      for (let i = 0; i < 5; i++) {
+        ctx.rotate((Math.PI * 2) / 5);
+        ctx.beginPath();
+        ctx.ellipse(0, -34, 10, 26, 0, 0, 7);
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.fillStyle = "#8fa9c7";
+      ctx.font = "12px 'Microsoft YaHei'";
+      ctx.fillText(p.v < 0.05 ? "风机停转" : `风机 ${fmt(p.v, 1)} m/s`, 46, H / 2 + 88);
+
+      // 管束 + 边界层
+      const blT = p.Re > 1 ? clamp(260 / Math.sqrt(p.Re), 2, 22) : 24;
+      TUBES.forEach((t) => {
+        // 尾流阴影
+        if (p.v > 0.05) {
+          const wk = ctx.createLinearGradient(t.x, 0, t.x + 90, 0);
+          wk.addColorStop(0, "rgba(70,110,160,0.18)");
+          wk.addColorStop(1, "rgba(70,110,160,0)");
+          ctx.fillStyle = wk;
+          ctx.fillRect(t.x, t.y - t.R * 0.8, 90, t.R * 1.6);
+        }
+        // 边界层薄膜
+        ctx.strokeStyle = "rgba(140,205,255,0.35)";
+        ctx.lineWidth = blT;
+        ctx.beginPath(); ctx.arc(t.x, t.y, t.R + blT / 2, 0, 7); ctx.stroke();
+        // 管壁 (内走制冷剂, 冷)
+        ctx.fillStyle = "#1f4d75";
+        ctx.beginPath(); ctx.arc(t.x, t.y, t.R, 0, 7); ctx.fill();
+        ctx.strokeStyle = "#9fc6e8";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(t.x, t.y, t.R, 0, 7); ctx.stroke();
+      });
+      ctx.lineWidth = 1;
+      ctx.fillStyle = "rgba(160,215,255,0.7)";
+      ctx.font = "11px Consolas";
+      ctx.fillText(`边界层 δ ∝ D/√Re (当前 ${fmt(blT, 1)}px 示意)`, 400, 26);
+      ctx.fillText("管内: 制冷剂蒸发 −26℃ (见 KP11)", 400, H - 18);
+
+      // 粒子
+      const px = p.v * 60;                       // px/s
+      parts.forEach((pt) => {
+        const { u, v: vv, inside } = velAt(pt.x, pt.y, px);
+        if (!inside && p.v > 0.02) {
+          pt.x += u * dt;
+          pt.y += vv * dt;
+        }
+        if (pt.x > W - 6 || inside) {
+          pt.x = 8 + Math.random() * 30;
+          pt.y = 20 + Math.random() * (H - 40);
+        }
+        const sp = Math.hypot(u, vv) / (px || 1);
+        ctx.fillStyle = `rgba(190,230,255,${clamp(0.2 + sp * 0.45, 0.15, 0.8)})`;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 1.7, 0, 7);
+        ctx.fill();
+        if (p.v > 0.02) {
+          ctx.strokeStyle = "rgba(150,210,255,0.28)";
+          ctx.beginPath();
+          ctx.moveTo(pt.x, pt.y);
+          ctx.lineTo(pt.x - u * 0.06, pt.y - vv * 0.06);
+          ctx.stroke();
+        }
+      });
+      if (p.v < 0.02) {
+        ctx.fillStyle = "rgba(230,240,255,0.8)";
+        ctx.font = "15px 'Microsoft YaHei'";
+        ctx.fillText("风机停转 → Gr/Re² ≫ 1,自然对流接管 (回到 KP04 的世界)", 280, H / 2);
+      }
+    }
+
+    // ---------------- 旋钮 ----------------
+    const knob = $("#knobSvg");
+    const A0 = -135, A1 = 135;
+    function drawKnob() {
+      knob.innerHTML = "";
+      svgEl("circle", { cx: 75, cy: 75, r: 62, fill: "#10203a", stroke: "rgba(140,190,255,0.4)", "stroke-width": 2 }, knob);
+      // 刻度
+      for (let i = 0; i <= 8; i++) {
+        const a = ((A0 + (i / 8) * (A1 - A0)) - 90) * Math.PI / 180;
+        const x1 = 75 + Math.cos(a) * 54, y1 = 75 + Math.sin(a) * 54;
+        const x2 = 75 + Math.cos(a) * 62, y2 = 75 + Math.sin(a) * 62;
+        svgEl("line", { x1, y1, x2, y2, stroke: "#6e93bd", "stroke-width": i % 2 ? 1 : 2 }, knob);
+        if (i % 2 === 0) svgEl("text", { x: 75 + Math.cos(a) * 44, y: 75 + Math.sin(a) * 44 + 4,
+          "text-anchor": "middle", class: "svg-note", text: i }, knob);
+      }
+      // 指针
+      const ang = ((A0 + (state.v / 8) * (A1 - A0)) - 90) * Math.PI / 180;
+      svgEl("line", { x1: 75, y1: 75, x2: 75 + Math.cos(ang) * 48, y2: 75 + Math.sin(ang) * 48,
+        stroke: "#ff9a5c", "stroke-width": 4, "stroke-linecap": "round" }, knob);
+      svgEl("circle", { cx: 75, cy: 75, r: 10, fill: "#1a66b8", stroke: "#dff0ff", "stroke-width": 2 }, knob);
+      svgEl("text", { x: 75, y: 122, "text-anchor": "middle", class: "svg-note", fill: "#ffcf9e",
+        text: "转速旋钮 m/s" }, knob);
+    }
+
+    let knobDrag = false;
+    knob.addEventListener("pointerdown", (e) => { knobDrag = true; knob.classList.add("dragging"); setKnob(e); });
+    addEventListener("pointermove", (e) => knobDrag && setKnob(e));
+    addEventListener("pointerup", () => { knobDrag = false; knob.classList.remove("dragging"); });
+    function setKnob(e) {
+      const r = knob.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+      let deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+      if (deg > 180) deg -= 360;
+      deg = clamp(deg, A0, A1);
+      state.v = ((deg - A0) / (A1 - A0)) * 8;
+      $("#vSlider").value = state.v;
+      $("#vSliderOut").textContent = `${fmt(state.v, 2)} m/s`;
+      refresh();
+    }
+
+    // ---------------- 收益/代价曲线 ----------------
+    const cs = $("#curveSvg");
+    function drawCurves(p) {
+      cs.innerHTML = "";
+      const X = scale([0, 8], [64, 610]);
+      const Y = scale([0, 20], [360, 30]);
+      svgEl("line", { x1: 64, y1: 360, x2: 610, y2: 360, stroke: "#39516d" }, cs);
+      svgEl("line", { x1: 64, y1: 360, x2: 64, y2: 24, stroke: "#39516d" }, cs);
+      [0, 2, 4, 6, 8].forEach((v) => svgEl("text", { x: X(v), y: 378, "text-anchor": "middle", class: "svg-note", text: v + "m/s" }, cs));
+      [5, 10, 15, 20].forEach((q) => svgEl("text", { x: 44, y: Y(q) + 4, class: "svg-note", text: q }, cs));
+      svgEl("text", { x: 70, y: 18, class: "svg-note", text: "kW" }, cs);
+
+      const fQ = (v) => 0.1876 * hOf(v);
+      const fP = (v) => 0.75 * Math.pow(v / 3, 3);
+      const fN = (v) => fQ(v) - fP(v);
+      const curve = (f, color, w = 2.5) => {
+        let d = "";
+        for (let v = 0; v <= 8.001; v += 0.1) {
+          const val = clamp(f(v), -2, 20);
+          d += (d ? "L" : "M") + X(v) + "," + Y(val);
+        }
+        svgEl("path", { d, fill: "none", stroke: color, "stroke-width": w }, cs);
+      };
+      curve(fQ, "#53c1ff");
+      curve(fP, "#ff6a4d");
+      curve(fN, "#ffd166", 3);
+      svgEl("text", { x: X(6.6), y: Y(fQ(6.6)) - 10, class: "svg-note", fill: "#9fd4ff", text: "换热收益 ∝ v⁰·⁶" }, cs);
+      svgEl("text", { x: X(6.9), y: Y(fP(6.9)) - 10, class: "svg-note", fill: "#ff9a86", text: "风机代价 ∝ v³" }, cs);
+      svgEl("text", { x: X(2.1), y: Y(fN(2.1)) + 20, class: "svg-note", fill: "#ffe4a3", text: "净收益" }, cs);
+      // 最优点
+      let best = 0, bv = 0;
+      for (let v = 0.5; v <= 8; v += 0.05) if (fN(v) > best) { best = fN(v); bv = v; }
+      svgEl("line", { x1: X(bv), y1: 360, x2: X(bv), y2: Y(best), stroke: "rgba(255,209,102,0.4)", "stroke-dasharray": "4 4" }, cs);
+      svgEl("circle", { cx: X(bv), cy: Y(best), r: 5.5, fill: "#fff3d6", stroke: "#c79a2a", "stroke-width": 2 }, cs);
+      svgEl("text", { x: X(bv), y: Y(best) - 12, "text-anchor": "middle", class: "svg-note", fill: "#ffe4a3",
+        text: `经济风速 ≈ ${fmt(bv, 1)} m/s` }, cs);
+      // 工作点
+      svgEl("circle", { cx: X(p.v), cy: Y(clamp(p.Q, 0, 20)), r: 6, fill: "#d8f0ff", stroke: "#1f7fd4", "stroke-width": 2 }, cs);
+      svgEl("text", { x: 320, y: 408, "text-anchor": "middle", class: "svg-note",
+        text: "风速翻倍: 换热 ×1.52,功率 ×8 —— 这就是不能无脑开大风机的原因" }, cs);
+    }
+
+    // ---------------- 仪表 ----------------
+    const SUPS = { 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹", "-": "⁻" };
+    const expFmt = (x) => {
+      if (!Number.isFinite(x)) return "∞";
+      if (x === 0) return "0";
+      const e = Math.floor(Math.log10(Math.abs(x)));
+      if (e >= -2 && e <= 3) return fmt(x, 2);
+      return `${fmt(x / 10 ** e, 1)}×10${String(e).split("").map((c) => SUPS[c] || c).join("")}`;
+    };
+
+    function refresh() {
+      const p = physics();
+      drawKnob();
+      drawCurves(p);
+      $("#vV").innerHTML = `${fmt(p.v, 2)}<small>m/s</small>`;
+      $("#vRe").textContent = fmt(p.Re, 0);
+      $("#vNu").textContent = fmt(p.Nu, 1);
+      $("#vH").innerHTML = `${fmt(p.h, 1)}<small>W/m²K</small>`;
+      $("#vP").innerHTML = `${fmt(p.P, 2)}<small>kW</small>`;
+      $("#vDry").innerHTML = `${fmt(p.h / hOf(3) * 100, 0)}<small>%</small>`;
+      const forced = p.grre2 < 0.1;
+      $("#regDot").className = "dot on";
+      $("#regDot").style.background = forced ? "#53c1ff" : "#ff9a5c";
+      $("#regDot").style.boxShadow = `0 0 11px ${forced ? "#53c1ff" : "#ff9a5c"}`;
+      $("#regTxt").textContent = `${expFmt(p.grre2)} → ` + (forced ? "强制对流主导" : p.grre2 > 10 ? "自然对流主导 (KP04)" : "混合对流");
+      return p;
+    }
+
+    bindSlider("#vSlider", "#vSliderOut", (v) => `${fmt(v, 2)} m/s`, (v) => { state.v = v; refresh(); });
+
+    let cur = refresh();
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      cur = physics();
+      drawField(cur, dt);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

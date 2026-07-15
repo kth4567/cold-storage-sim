@@ -79,6 +79,7 @@ curl http://127.0.0.1:8017/api/state    # should return a JSON snapshot
 | R | Reset the whole scene (rigid bodies + thermodynamics) |
 | T | Manual defrost |
 | 1 / 2 / 3 | Thermodynamics time scale 1× / 30× / 120× |
+| Q | Inspect the heat-transfer knowledge point of whatever the crosshair targets (popup → interactive lesson page) |
 | Esc | Release the mouse (to use the control panel buttons) |
 
 **Suggested tour:** press `2` (30× time), slide the door open with `E`, and watch the
@@ -89,6 +90,18 @@ and watch the compressor claw the temperature back down; the moisture you let in
 up the evaporator coil, and past 8 kg of frost a defrost cycle kicks in automatically —
 the ceiling fans stop spinning while it runs. Throw a crate into the doorway and try
 to close the door on it.
+
+---
+
+## Interactive Heat-Transfer Lessons
+
+Every part of the cold room doubles as a heat-transfer lesson. Aim at a **wall / roof /
+floor / door / unit cooler / fan / ceiling pipe / cargo box** and press `Q` to open a
+popup with the matching knowledge point, then jump into its dedicated interactive page.
+The full atlas of 11 lessons lives at `/kp/` — each page has a unique interaction
+metaphor (draggable insulation layer, sun-path slider, frost/defrost sawtooth, Bi
+seesaw, surface-vs-center cooling race, critical insulation radius, ...) and runs its
+physics entirely in the browser, matching the worked examples in `docs/kp/`.
 
 ---
 

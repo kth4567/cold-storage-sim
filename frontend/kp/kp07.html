@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./kp.css" />
+  <style>
+    .frost-row { display: flex; gap: 14px; }
+    .frost-row .left { flex: 1 1 auto; min-width: 0; }
+    .frost-row .right { flex: 0 0 190px; }
+    .frost-row canvas, .frost-row svg { width: 100%; display: block; border-radius: 8px; }
+    #defrostBtn7 {
+      width: 100%; padding: 13px; font-size: 15.5px; margin-top: 10px;
+    }
+    #defrostBtn7:disabled { opacity: 0.5; cursor: wait; }
+    @media (max-width: 800px) { .frost-row { flex-direction: column; } .frost-row .right { flex: 1 1 auto; } }
+  </style>
+</head>
+<body data-kp="KP07">
+  <div class="kp-wrap" id="wrap">
+
+    <div class="panel viz-box">
+      <h3>结霜生长 · 热阻堆叠 <small>左:翅片间霜层实时长厚 · 右:热阻条被霜"顶高"</small></h3>
+      <div class="frost-row">
+        <div class="left"><canvas id="finCanvas" width="700" height="330"></canvas></div>
+        <div class="right"><svg id="stackSvg" viewBox="0 0 190 330" preserveAspectRatio="xMidYMid meet"></svg></div>
+      </div>
+      <div class="hintline">💡 <b>核心体验</b>:看着霜慢慢长厚、制冷量一路下滑——什么时候按除霜?按早了浪费除霜能耗,按晚了换热太差。开"自动按需除霜"和你的手感比比平均能效。</div>
+    </div>
+
+    <div class="panel viz-box">
+      <h3>换热能力锯齿曲线 <small>结霜期下滑 → 除霜垂直回弹 → 周而复始</small></h3>
+      <svg id="sawSvg" viewBox="0 0 960 250" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="kp-grid main-side">
+      <div class="panel">
+        <h3>工况控制 <small>1 秒 ≈ 仿真 0.5 小时</small></h3>
+        <div class="ctl-row">
+          <label>库内湿度</label>
+          <input type="range" id="rh" min="60" max="95" step="1" value="85" />
+          <output id="rhOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>蒸发温度</label>
+          <input type="range" id="tev" min="-35" max="-15" step="1" value="-26" />
+          <output id="tevOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>迎面风速</label>
+          <input type="range" id="vel" min="1" max="5" step="0.1" value="3" class="mono-track" />
+          <output id="velOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>自动按需除霜</label>
+          <button class="kbtn" id="autoBtn">关</button>
+          <span class="hintline" style="margin:0">Q/Q₀ ≤ 73% 时自动触发</span>
+        </div>
+        <button class="kbtn hot" id="defrostBtn7">❄ 立即除霜</button>
+      </div>
+
+      <div class="panel">
+        <h3>运行台账</h3>
+        <div class="cards">
+          <div class="card"><div class="lbl">霜层厚度 δ</div><div class="val" id="vD">--<small>mm</small></div></div>
+          <div class="card"><div class="lbl">霜层热阻 δ/λ</div><div class="val" id="vRf">--<small>m²K/W</small></div></div>
+          <div class="card hot"><div class="lbl">换热能力 Q/Q₀</div><div class="val" id="vQr">--<small>%</small></div></div>
+          <div class="card"><div class="lbl">有效风量</div><div class="val" id="vVe">--<small>%</small></div></div>
+          <div class="card warn"><div class="lbl">除霜次数</div><div class="val" id="vN">0</div></div>
+          <div class="card ok"><div class="lbl">平均净能效(扣除霜账)</div><div class="val" id="vAvg">--<small>%</small></div></div>
+        </div>
+        <div class="formula cold-side">R<sub>frost</sub> = δ/λ<sub>frost</sub>,λ<sub>frost</sub>≈0.15 W/(m·K) —— 霜是多孔"棉衣"</div>
+        <div class="formula">Q/Q₀ = R₀ / (R₀′ + R<sub>frost</sub>),堵风使 R₀′ = R₀·(v₀/v<sub>eff</sub>)⁰·⁷</div>
+      </div>
+    </div>
+
+    <details class="knowledge">
+      <summary>知识速览 —— 霜层热阻</summary>
+      <div class="kbody">
+        <h4>物理图景</h4>
+        <p>库内水汽在低于露点又低于冰点的盘管表面直接凝华成霜。霜多孔含气,导热系数只有 0.1~0.3 W/(m·K)——
+          等于给蒸发器"穿了件棉衣";同时霜堵塞翅片间隙,风量下降,对流也被削弱,<b>双重衰减</b>。</p>
+        <h4>核心公式</h4>
+        <p>霜层热阻 R<sub>frost</sub> = δ/λ<sub>frost</sub>(KP01 一维导热热阻的直接应用);
+          结霜速率由传质驱动 ṁ = h<sub>m</sub>A(ρ<sub>v,∞</sub>−ρ<sub>v,s</sub>),空气越湿、盘管越冷、风速越大,长霜越快。</p>
+        <h4>典型数值(本页模型即此例)</h4>
+        <p>无霜热阻 R₀=0.04,结霜 2mm(λ=0.15)→ R<sub>frost</sub>=0.0133,换热掉到 <b>75%</b>;
+          若堵塞再使 R₀ 增大 20%,综合只剩 <b>65%</b>——堵风比霜本身更凶。</p>
+        <h4>常见误区</h4>
+        <p class="trap">霜是冰、导热还行?——霜多孔含气,λ 很低,是隔热层。</p>
+        <p class="trap">只算导热热阻?——霜还堵流道降风量,双重衰减。</p>
+        <p class="trap">除霜越勤越好?——除霜耗能且把热带进库,有最优频率:损失账 vs 除霜账的平衡点。</p>
+        <h4>与其他知识点</h4>
+        <p>霜层热阻插进 KP05 的 U 分母;堵风降 h<sub>o</sub> 接 KP06;湿气来源是 KP04 的开门渗湿;δ/λ 本身就是 KP01。</p>
+      </div>
+    </details>
+  </div>
+
+  <script type="module">
+    import { initPage, svgEl, $, fmt, clamp, scale, bindSlider } from "./kp-common.js";
+    initPage();
+
+    const R0 = 0.04, LAM_F = 0.15, K_BLOCK = 0.115;   // 堵塞系数: 2mm → 风量-23% → R₀×1.2
+    const state = {
+      rh: 85, tev: -26, v: 3,
+      delta: 0, simH: 0, defrosting: 0, auto: false,
+      nDef: 0, lossInt: 0, defCost: 0,
+    };
+    const E_DEF = 1.2;              // 每次除霜的等效能耗账 (Q·h)
+    const SPEED = 0.5;              // 仿真小时 / 真实秒
+    const history = [];             // {h, q} 采样
+
+    function frostRate() {          // mm / 仿真小时
+      const humid = clamp((state.rh - 55) / 30, 0, 1.4);
+      const cold = clamp((-10 - state.tev) / 16, 0.2, 1.6);
+      const wind = Math.pow(state.v / 3, 0.4);
+      return 0.25 * humid * cold * wind;
+    }
+
+    function perf() {
+      const vEff = clamp(1 - K_BLOCK * state.delta, 0.3, 1);
+      const R0eff = R0 * Math.pow(1 / vEff, 0.7);
+      const Rf = (state.delta / 1000) / LAM_F;
+      const q = state.defrosting > 0 ? 0 : R0 / (R0eff + Rf);
+      return { vEff, R0eff, Rf, q };
+    }
+
+    function doDefrost() {
+      if (state.defrosting > 0) return;
+      state.defrosting = 1.4;                 // 秒
+      state.nDef++;
+      state.defCost += E_DEF;
+      $("#defrostBtn7").disabled = true;
+    }
+
+    // ---------------- 翅片结霜 Canvas ----------------
+    const cv = $("#finCanvas"), ctx = cv.getContext("2d");
+    function drawFins(p) {
+      const W = cv.width, H = cv.height;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = "rgba(12,20,34,0.92)";
+      ctx.fillRect(0, 0, W, H);
+
+      const nFin = 9, gap = 64, x0 = 90, finW = 7;
+      const frostPx = state.delta * 11;
+      // airflow arrows
+      const aA = 0.15 + 0.5 * p.vEff;
+      ctx.strokeStyle = `rgba(150,210,255,${aA})`;
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) {
+        const y = 55 + i * 70;
+        ctx.beginPath(); ctx.moveTo(14, y); ctx.lineTo(64, y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(64, y - 5); ctx.lineTo(74, y); ctx.lineTo(64, y + 5); ctx.closePath(); ctx.fill();
+      }
+      ctx.lineWidth = 1;
+      ctx.font = "12px 'Microsoft YaHei'";
+      ctx.fillStyle = "rgba(160,215,255,0.8)";
+      ctx.fillText(`风 ${fmt(p.vEff * 100, 0)}%`, 14, 30);
+
+      for (let i = 0; i < nFin; i++) {
+        const x = x0 + i * gap;
+        // 盘管圆 (穿翅片)
+        ctx.fillStyle = "#1f4d75";
+        [90, 240].forEach((cy) => {
+          ctx.beginPath(); ctx.arc(x + finW / 2, cy, 13, 0, 7); ctx.fill();
+        });
+        // 翅片
+        ctx.fillStyle = "#93a4b3";
+        ctx.fillRect(x, 26, finW, H - 52);
+        // 霜层 (两侧, 多孔纹理)
+        if (frostPx > 0.4) {
+          ctx.fillStyle = "rgba(222,240,252,0.88)";
+          ctx.fillRect(x - frostPx, 26, frostPx, H - 52);
+          ctx.fillRect(x + finW, 26, frostPx, H - 52);
+          // 疏松噪点
+          ctx.fillStyle = "rgba(160,190,215,0.5)";
+          for (let s = 0; s < frostPx * 3; s++) {
+            const sx = x - frostPx + ((s * 61.3 + i * 17) % (frostPx * 2 + finW));
+            const sy = 28 + ((s * 97.7 + i * 31) % (H - 56));
+            ctx.fillRect(sx, sy, 1.5, 1.5);
+          }
+        }
+      }
+      // 除霜中提示
+      if (state.defrosting > 0) {
+        ctx.fillStyle = "rgba(255,170,90,0.9)";
+        ctx.font = "17px 'Microsoft YaHei'";
+        ctx.fillText("除霜中… 风机停转,融霜热部分进库成为额外负荷", 150, H / 2);
+      }
+      ctx.fillStyle = "rgba(200,222,245,0.7)";
+      ctx.font = "11px Consolas";
+      ctx.fillText(`δ_frost = ${fmt(state.delta, 2)} mm · 翅隙被霜蚕食 → 风阻上升`, 90, H - 8);
+    }
+
+    // ---------------- 热阻堆叠条 ----------------
+    const stack = $("#stackSvg");
+    function drawStack(p) {
+      stack.innerHTML = "";
+      const items = [
+        { name: "管壁", R: 0.002, c: "#aeb9c4" },
+        { name: "空气侧 R₀′", R: p.R0eff - 0.002, c: "#ff9a5c" },
+        { name: "霜层", R: p.Rf, c: "#cfeaff" },
+      ];
+      const total = Math.max(items.reduce((s, i) => s + i.R, 0), 0.055);
+      const Y = scale([0, 0.085], [300, 20]);
+      let y = 300;
+      items.forEach((it) => {
+        const hpx = 300 - Y(it.R);
+        if (hpx < 1) return;
+        svgEl("rect", { x: 40, y: y - hpx, width: 80, height: hpx, fill: it.c, opacity: 0.88,
+          stroke: "rgba(8,12,20,0.7)" }, stack);
+        if (hpx > 16) svgEl("text", { x: 80, y: y - hpx / 2 + 4, "text-anchor": "middle", class: "svg-note",
+          fill: "#0d141f", "font-weight": "700", text: it.name }, stack);
+        svgEl("text", { x: 128, y: y - hpx / 2 + 4, class: "svg-note", text: fmt(it.R, 4) }, stack);
+        y -= hpx;
+      });
+      svgEl("text", { x: 95, y: 322, "text-anchor": "middle", class: "svg-note",
+        text: "热阻堆叠 m²K/W" }, stack);
+    }
+
+    // ---------------- 锯齿曲线 ----------------
+    const saw = $("#sawSvg");
+    const WIN = 72;                  // 显示窗口 仿真小时
+    function drawSaw() {
+      saw.innerHTML = "";
+      const h0 = Math.max(0, state.simH - WIN);
+      const X = scale([h0, Math.max(state.simH, WIN)], [70, 930]);
+      const Y = scale([0, 1.05], [212, 24]);
+      svgEl("line", { x1: 70, y1: 212, x2: 930, y2: 212, stroke: "#39516d" }, saw);
+      svgEl("line", { x1: 70, y1: 212, x2: 70, y2: 20, stroke: "#39516d" }, saw);
+      [0.5, 0.75, 1].forEach((v) => {
+        svgEl("line", { x1: 68, y1: Y(v), x2: 930, y2: Y(v), stroke: "rgba(90,130,180,0.12)" }, saw);
+        svgEl("text", { x: 44, y: Y(v) + 4, class: "svg-note", text: `${v * 100}%` }, saw);
+      });
+      // 自动阈值线
+      svgEl("line", { x1: 70, y1: Y(0.73), x2: 930, y2: Y(0.73), stroke: "rgba(255,179,107,0.35)", "stroke-dasharray": "5 5" }, saw);
+      svgEl("text", { x: 860, y: Y(0.73) - 6, class: "svg-note", fill: "#ffcf9e", text: "按需除霜阈值" }, saw);
+      const pts = history.filter((s) => s.h >= h0);
+      if (pts.length > 1) {
+        svgEl("polyline", { points: pts.map((s) => `${X(s.h)},${Y(s.q)}`).join(" "),
+          fill: "none", stroke: "#53c1ff", "stroke-width": 2.2 }, saw);
+      }
+      svgEl("text", { x: 500, y: 240, "text-anchor": "middle", class: "svg-note",
+        text: `仿真时间轴 (最近 ${WIN} 小时) —— 下滑=结霜衰减,垂直回弹=除霜`, }, saw);
+    }
+
+    // ---------------- 仪表 ----------------
+    function renderMetrics(p) {
+      $("#vD").innerHTML = `${fmt(state.delta, 2)}<small>mm</small>`;
+      $("#vRf").innerHTML = `${fmt(p.Rf, 4)}<small>m²K/W</small>`;
+      $("#vQr").innerHTML = `${fmt(p.q * 100, 1)}<small>%</small>`;
+      $("#vVe").innerHTML = `${fmt(p.vEff * 100, 0)}<small>%</small>`;
+      $("#vN").textContent = state.nDef;
+      const avg = state.simH > 1 ? (state.lossInt - state.defCost) / state.simH : null;
+      $("#vAvg").innerHTML = avg === null ? "--" : `${fmt(clamp(avg, 0, 1) * 100, 1)}<small>%</small>`;
+    }
+
+    // ---------------- 时间引擎 ----------------
+    let last = performance.now(), sampleAcc = 0;
+    function loop(now) {
+      const dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      const dH = dt * SPEED;
+
+      if (state.defrosting > 0) {
+        state.defrosting -= dt;
+        state.delta = Math.max(0, state.delta - dt * 4.5);
+        if (state.defrosting <= 0) {
+          state.delta = 0;
+          $("#defrostBtn7").disabled = false;
+        }
+      } else {
+        state.delta = Math.min(5, state.delta + frostRate() * dH);
+      }
+      state.simH += dH;
+
+      const p = perf();
+      state.lossInt += p.q * dH;
+      if (state.auto && state.defrosting <= 0 && p.q > 0 && p.q <= 0.73) doDefrost();
+
+      sampleAcc += dH;
+      if (sampleAcc > 0.15) {
+        sampleAcc = 0;
+        history.push({ h: state.simH, q: p.q });
+        if (history.length > 900) history.shift();
+      }
+
+      drawFins(p);
+      drawStack(p);
+      drawSaw();
+      renderMetrics(p);
+      requestAnimationFrame(loop);
+    }
+
+    bindSlider("#rh", "#rhOut", (v) => `${v} %`, (v) => { state.rh = v; });
+    bindSlider("#tev", "#tevOut", (v) => `${v} ℃`, (v) => { state.tev = v; });
+    bindSlider("#vel", "#velOut", (v) => `${fmt(v, 1)} m/s`, (v) => { state.v = v; });
+    $("#defrostBtn7").addEventListener("click", doDefrost);
+    $("#autoBtn").addEventListener("click", () => {
+      state.auto = !state.auto;
+      $("#autoBtn").textContent = state.auto ? "开" : "关";
+      $("#autoBtn").classList.toggle("on", state.auto);
+    });
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

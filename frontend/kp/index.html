@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>传热学知识点总览 · 数字冷库</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./kp.css" />
+  <style>
+    .hub-header { text-align: center; padding: 34px 0 10px; }
+    .hub-header .kp-kicker { margin-bottom: 10px; }
+    .hub-header h1 { margin: 0; font-size: 32px; letter-spacing: 3px; }
+    .hub-header p { color: var(--muted); max-width: 640px; margin: 12px auto 0; }
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+    a.kp-card {
+      display: block;
+      padding: 18px 20px 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      color: var(--ink);
+      text-decoration: none;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+    }
+    a.kp-card:hover {
+      border-color: var(--line-strong);
+      transform: translateY(-3px);
+      box-shadow: 0 22px 44px rgba(0, 0, 0, 0.4);
+    }
+    a.kp-card .bignum {
+      position: absolute;
+      right: 6px;
+      top: -14px;
+      font-family: var(--mono);
+      font-size: 88px;
+      font-weight: 700;
+      color: transparent;
+      -webkit-text-stroke: 1px rgba(110, 175, 245, 0.22);
+      pointer-events: none;
+      user-select: none;
+    }
+    a.kp-card:hover .bignum { -webkit-text-stroke-color: rgba(255, 150, 80, 0.4); }
+    a.kp-card h2 { margin: 0 0 4px; font-size: 17.5px; }
+    a.kp-card .part { font-size: 12px; color: var(--cold); font-family: var(--mono); }
+    a.kp-card .brief { margin-top: 9px; font-size: 12.8px; color: #b7cbe2; line-height: 1.6; }
+    a.kp-card .f { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: #ffce9f; }
+    .thread { margin-top: 14px; }
+    .thread .chain {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      font-family: var(--mono);
+      font-size: 12.5px;
+    }
+    .thread .chain a {
+      padding: 4px 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: #d6eaff;
+      text-decoration: none;
+      background: rgba(20, 42, 72, 0.5);
+    }
+    .thread .chain a:hover { background: rgba(35, 78, 130, 0.7); }
+    .thread .chain .arrow { color: var(--hot); }
+    .thread p { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+  </style>
+</head>
+<body>
+  <div class="kp-wrap">
+    <div class="hub-header">
+      <div class="kp-kicker">COLD STORAGE · HEAT TRANSFER ATLAS</div>
+      <h1>传热学知识点总览</h1>
+      <p>冷库的每一个部位都是一堂传热课。11 个知识点,11 个互不雷同的交互记忆点——
+        从墙体里的温度折线,到货物中心的降温赛跑。</p>
+      <a class="kp-back" href="../index.html" style="display:inline-block;margin-top:14px">⟵ 回到冷库巡检</a>
+    </div>
+
+    <div class="hub-grid" id="grid"></div>
+
+    <div class="panel" style="margin-top:30px">
+      <h3>推荐串讲线索 <small>四条主线走完全部知识点</small></h3>
+      <div id="threads"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { KP_META, KP_BY_ID } from "./kp-meta.js";
+
+    const grid = document.getElementById("grid");
+    KP_META.forEach((k) => {
+      const a = document.createElement("a");
+      a.className = "kp-card";
+      a.href = "./" + k.file;
+      a.innerHTML = `
+        <div class="bignum">${k.num}</div>
+        <div class="part">${k.id} · ${k.part} · ${k.cat}</div>
+        <h2>${k.title}</h2>
+        <div class="brief">${k.brief}</div>
+        <div class="f">${k.formula}</div>`;
+      grid.appendChild(a);
+    });
+
+    const THREADS = [
+      { name: "① 围护结构得热(稳态起步)", ids: ["KP01", "KP02", "KP03", "KP11"],
+        note: "导热三形态:平壁 → 屋面辐射叠加 → 地板非稳态入门 → 圆筒曲面。" },
+      { name: "② 对流三兄弟", ids: ["KP04", "KP06", "KP08"],
+        note: "自然对流 → 强制对流 → 表面传热,用 Bi 数承接内外热阻。" },
+      { name: "③ 货物降温主线(核心分叉)", ids: ["KP08", "KP09", "KP10"],
+        note: "KP08 的 Bi 判据是岔路口:Bi>0.1 走 KP09 非稳态,Bi<0.1 走 KP10 集中参数。" },
+      { name: "④ 蒸发器全景", ids: ["KP05", "KP06", "KP07", "KP11"],
+        note: "换热器 → 风机强制对流 → 霜层衰减 → 盘管管道,构成蒸发器换热闭环。" },
+    ];
+    const tBox = document.getElementById("threads");
+    THREADS.forEach((t) => {
+      const div = document.createElement("div");
+      div.className = "thread";
+      const chain = t.ids
+        .map((id) => `<a href="./${KP_BY_ID[id].file}">${id} ${KP_BY_ID[id].title}</a>`)
+        .join('<span class="arrow">→</span>');
+      div.innerHTML = `<div class="chain">${chain}</div><p>${t.note}</p>`;
+      tBox.appendChild(div);
+    });
+  </script>
+</body>
+</html>

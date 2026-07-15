@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./kp.css" />
+  <style>
+    .wall-layer { cursor: pointer; transition: filter 0.12s; }
+    .wall-layer.hl { filter: brightness(1.35); }
+    .drag-handle { cursor: ew-resize; }
+    .drag-handle rect { fill: rgba(230, 244, 255, 0.0); }
+    .drag-handle line { stroke: rgba(230, 244, 255, 0.55); stroke-width: 1.5; }
+    .drag-handle:hover line, .drag-handle.dragging line { stroke: #ffb36b; stroke-width: 2.5; }
+    .res-seg { cursor: pointer; }
+    .res-seg rect { transition: filter 0.12s; }
+    .res-seg.hl rect { filter: brightness(1.5); }
+  </style>
+</head>
+<body data-kp="KP01">
+  <div class="kp-wrap" id="wrap">
+
+    <div class="panel viz-box">
+      <h3>墙体剖面 · 温度折线三联动 <small>拖动层边界或滑杆改厚度,温度折线实时重绘</small></h3>
+      <svg id="wallSvg" viewBox="0 0 960 400" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="hintline">💡 <b>核心体验</b>:把保温层拖厚,看它的温度折线段变陡、K 值掉下来——λ 小的层"扛住"大部分温差。悬停任一层,下方热阻梯子同步发光。</div>
+    </div>
+
+    <div class="panel viz-box">
+      <h3>热阻梯子 · 电路类比 <small>每段电阻长度 ∝ 热阻值 R = δ/λ,串联相加</small></h3>
+      <svg id="ladderSvg" viewBox="0 0 960 130" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="kp-grid main-side">
+      <div class="panel">
+        <h3>墙体分层控制 <small>从室外到库内</small></h3>
+        <div id="layerCtls"></div>
+        <h3 style="margin-top:20px">环境参数</h3>
+        <div class="ctl-row">
+          <label>室外温度 t<sub>o</sub></label>
+          <input type="range" id="tO" min="-10" max="45" step="1" value="30" />
+          <output id="tOOut" class="hot"></output>
+        </div>
+        <div class="ctl-row">
+          <label>库内温度 t<sub>i</sub></label>
+          <input type="range" id="tI" min="-30" max="10" step="1" value="-18" />
+          <output id="tIOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>外表面 h<sub>o</sub></label>
+          <input type="range" id="hO" class="mono-track" min="5" max="40" step="0.5" value="23" />
+          <output id="hOOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>内表面 h<sub>i</sub></label>
+          <input type="range" id="hI" class="mono-track" min="2" max="20" step="0.5" value="8" />
+          <output id="hIOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>库内相对湿度</label>
+          <input type="range" id="rhIn" class="mono-track" min="50" max="100" step="1" value="85" />
+          <output id="rhInOut"></output>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>实时指标</h3>
+        <div class="cards" style="flex-direction:column">
+          <div class="card"><div class="lbl">传热系数 K</div><div class="val" id="vK">--<small>W/(m²·K)</small></div></div>
+          <div class="card hot"><div class="lbl">热流密度 q</div><div class="val" id="vQ">--<small>W/m²</small></div></div>
+          <div class="card"><div class="lbl">总热阻 R<sub>total</sub></div><div class="val" id="vR">--<small>m²·K/W</small></div></div>
+          <div class="card"><div class="lbl">内表面温度</div><div class="val" id="vTs">--<small>°C</small></div></div>
+          <div class="card" id="dewCard"><div class="lbl">结露校核(内表面 vs 库内露点)</div>
+            <div class="val" style="font-size:15px"><span class="dot ok" id="dewDot"></span><span id="dewTxt">--</span></div></div>
+        </div>
+        <div class="formula" style="margin-top:14px">K = 1 / (1/h<sub>o</sub> + Σδ<sub>i</sub>/λ<sub>i</sub> + 1/h<sub>i</sub>)</div>
+        <div class="formula cold-side">q = K · (t<sub>o</sub> − t<sub>i</sub>)</div>
+      </div>
+    </div>
+
+    <details class="knowledge">
+      <summary>知识速览 —— 一维稳态导热</summary>
+      <div class="kbody">
+        <h4>物理图景</h4>
+        <p>墙的长宽远大于厚度,热量几乎只沿厚度方向流动(一维);运行足够久后温度不再随时间变化(稳态),
+          此时热流密度 q 沿厚度处处相等——单层内温度是<b>直线</b>,多层是<b>分段折线</b>,λ 越小的层温降越陡。</p>
+        <h4>核心链条</h4>
+        <p>傅里叶定律 q = −λ·dT/dx → 单层 q = λΔT/δ → 热阻 R = δ/λ(与欧姆定律 I=U/R 完全同构)→
+          多层串联 R<sub>total</sub> = 1/h<sub>o</sub> + Σδ/λ + 1/h<sub>i</sub> → 传热系数 K = 1/R<sub>total</sub>。</p>
+        <h4>典型数值(本页默认参数即此例)</h4>
+        <p>200mm 混凝土(λ=1.5)+ 100mm 聚氨酯(λ=0.025),t<sub>o</sub>=30℃、t<sub>i</sub>=−18℃、h<sub>o</sub>=23、h<sub>i</sub>=8:
+          R<sub>total</sub>≈4.30,K≈0.23 W/(m²·K),q≈11.2 W/m²;保温层承担 44.7℃ 温差,占 48℃ 总温差的 <b>93%</b>。
+          冷藏库外墙一般要求 K ≤ 0.3~0.4,冻结库更低。</p>
+        <h4>常见误区</h4>
+        <p class="trap">墙内温度是曲线?——稳态、常物性单层内是直线,多层是折线。</p>
+        <p class="trap">K 和 λ 是一回事?——λ 是材料属性;K 是整堵墙含表面换热的综合指标。</p>
+        <p class="trap">保温越厚越好?——存在"经济厚度":运行费与初投资之和最小,且过厚挤占库容。</p>
+        <h4>与其他知识点</h4>
+        <p>KP11 把平壁换成管壁(热阻变 ln 形式);KP04/KP06 提供表面 h 值;KP02 屋面还叠加辐射;KP03 地坪是非稳态渗透。</p>
+      </div>
+    </details>
+  </div>
+
+  <script type="module">
+    import { initPage, svgEl, $, fmt, clamp, scale, tempColor, bindSlider } from "./kp-common.js";
+    initPage();
+
+    // ---------------- 材料库 ----------------
+    const MATS = {
+      pu:   { name: "聚氨酯 PU",   k: 0.025, color: "#c9a04a" },
+      xps:  { name: "挤塑板 XPS",  k: 0.030, color: "#4aa0c9" },
+      eps:  { name: "聚苯板 EPS",  k: 0.038, color: "#8fb8d8" },
+      rock: { name: "岩棉",        k: 0.045, color: "#a08468" },
+      conc: { name: "钢筋混凝土",  k: 1.5,   color: "#7d8794" },
+      brick:{ name: "砖砌体",      k: 0.81,  color: "#a06a52" },
+      aac:  { name: "加气混凝土",  k: 0.22,  color: "#9aa4a8" },
+      steelp:{ name: "彩钢板",     k: 45,    color: "#c3ccd4" },
+      ss:   { name: "不锈钢板",    k: 17,    color: "#aeb9c4" },
+      ply:  { name: "胶合板",      k: 0.17,  color: "#b5915f" },
+    };
+
+    // 默认 = 讲解文档例题: 混凝土200 + PU100 (面板层热阻可忽略), K≈0.23, q≈11.2
+    const state = {
+      layers: [
+        { label: "外饰面板", mat: "steelp", d: 1,   min: 1,  max: 20 },
+        { label: "结构层",   mat: "conc",   d: 200, min: 50, max: 400 },
+        { label: "保温层",   mat: "pu",     d: 100, min: 20, max: 300 },
+        { label: "内衬板",   mat: "ss",     d: 1,   min: 1,  max: 20 },
+      ],
+      tO: 30, tI: -18, hO: 23, hI: 8, rhIn: 85,
+    };
+
+    // ---------------- 计算 ----------------
+    function compute() {
+      const Ro = 1 / state.hO, Ri = 1 / state.hI;
+      const Rs = state.layers.map((L) => (L.d / 1000) / MATS[L.mat].k);
+      const Rtot = Ro + Rs.reduce((a, b) => a + b, 0) + Ri;
+      const K = 1 / Rtot;
+      const q = K * (state.tO - state.tI);
+      // 界面温度: 室外空气 → 外表面 → 各层界面 → 内表面 → 库内空气
+      const T = [state.tO, state.tO - q * Ro];
+      Rs.forEach((R) => T.push(T[T.length - 1] - q * R));
+      // 露点 (Magnus, 库内)
+      const a = 17.62, b = 243.12, t = state.tI;
+      const g = Math.log(state.rhIn / 100) + (a * t) / (b + t);
+      const dew = (b * g) / (a - g);
+      return { Ro, Ri, Rs, Rtot, K, q, T, tSurfIn: T[T.length - 1], dew };
+    }
+
+    // ---------------- 墙体剖面渲染 ----------------
+    const wallSvg = $("#wallSvg");
+    const ladderSvg = $("#ladderSvg");
+    let hover = -1;                 // 悬停层索引 (-1 无; -2=R_o; -3=R_i)
+    let layout = null;              // {xs:[层左边界px], k: px/mm}
+
+    const X0 = 120, X1 = 840, YTOP = 68, YBOT = 268, BAND_Y = 300;
+
+    function computeLayout() {
+      const avail = X1 - X0;
+      const MINW = 16;
+      const total = state.layers.reduce((s, L) => s + L.d, 0);
+      // 两遍分配: 先给薄层最小宽度, 剩余按厚度比例
+      let flexD = 0, fixedW = 0;
+      const raw = state.layers.map((L) => (L.d / total) * avail);
+      state.layers.forEach((L, i) => { if (raw[i] < MINW) fixedW += MINW; else flexD += L.d; });
+      const k = (avail - fixedW) / flexD;
+      const widths = state.layers.map((L, i) => (raw[i] < MINW ? MINW : L.d * k));
+      const xs = [X0];
+      widths.forEach((w) => xs.push(xs[xs.length - 1] + w));
+      return { xs, widths, k };
+    }
+
+    function renderWall(r) {
+      wallSvg.innerHTML = "";
+      layout = computeLayout();
+      const { xs, widths } = layout;
+      const tLo = Math.min(state.tI, r.tSurfIn) - 5;
+      const tHi = Math.max(state.tO, r.T[1]) + 5;
+      const ty = scale([tLo, tHi], [YBOT, YTOP]);
+
+      // 室外 / 库内空气区
+      svgEl("rect", { x: 20, y: YTOP - 26, width: X0 - 20, height: YBOT - YTOP + 26, fill: "rgba(120,40,10,0.16)" }, wallSvg);
+      svgEl("rect", { x: X1, y: YTOP - 26, width: 940 - X1, height: YBOT - YTOP + 26, fill: "rgba(20,60,110,0.2)" }, wallSvg);
+      svgEl("text", { x: 30, y: YTOP - 6, class: "svg-note", fill: "#ffb28a", text: `室外 ${state.tO}℃` }, wallSvg);
+      svgEl("text", { x: X1 + 12, y: YTOP - 6, class: "svg-note", fill: "#9fd4ff", text: `库内 ${state.tI}℃` }, wallSvg);
+
+      // 各层矩形 + 标注
+      state.layers.forEach((L, i) => {
+        const m = MATS[L.mat];
+        const g = svgEl("g", { class: "wall-layer" + (hover === i ? " hl" : ""), "data-i": i }, wallSvg);
+        svgEl("rect", {
+          x: xs[i], y: YTOP, width: widths[i], height: YBOT - YTOP,
+          fill: m.color, opacity: i === 2 ? 0.92 : 0.75,
+          stroke: i === 2 ? "#ffb36b" : "rgba(10,16,26,0.7)", "stroke-width": i === 2 ? 2 : 1,
+        }, g);
+        const cx = xs[i] + widths[i] / 2;
+        if (widths[i] > 34) {
+          svgEl("text", { x: cx, y: YTOP + 18, "text-anchor": "middle", class: "svg-note", fill: "#0c1420",
+            "font-weight": "700", text: m.name }, g);
+          svgEl("text", { x: cx, y: YTOP + 33, "text-anchor": "middle", class: "svg-note", fill: "#17202c",
+            text: `λ=${m.k}` }, g);
+        }
+        svgEl("text", { x: cx, y: YBOT + 16, "text-anchor": "middle", class: "svg-note", text: `${L.d}mm` }, g);
+        // 该层温降占比
+        const dT = r.q * r.Rs[i];
+        const share = (dT / (state.tO - state.tI)) * 100;
+        if (share > 3) {
+          svgEl("text", { x: cx, y: BAND_Y + 42, "text-anchor": "middle", class: "svg-note",
+            fill: share > 50 ? "#ffb36b" : "#8fa9c7", text: `ΔT ${fmt(dT, 1)}℃ · ${fmt(share, 0)}%` }, wallSvg);
+        }
+        g.addEventListener("mouseenter", () => { hover = i; update(); });
+        g.addEventListener("mouseleave", () => { hover = -1; update(); });
+      });
+
+      // 温度色带 (逐层渐变)
+      const defs = svgEl("defs", {}, wallSvg);
+      const grad = svgEl("linearGradient", { id: "tband", x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
+      const bandT = [r.T[1], ...r.Rs.map((_, i) => r.T[i + 2])];   // 各界面温
+      const stopsX = xs.map((x) => (x - X0) / (X1 - X0));
+      svgEl("stop", { offset: 0, "stop-color": tempColor(r.T[1], -30, 45) }, grad);
+      bandT.forEach((t, i) => {
+        svgEl("stop", { offset: stopsX[i + 1] ?? 1, "stop-color": tempColor(t, -30, 45) }, grad);
+      });
+      svgEl("rect", { x: X0, y: BAND_Y, width: X1 - X0, height: 14, rx: 3, fill: "url(#tband)" }, wallSvg);
+      svgEl("text", { x: X0 - 8, y: BAND_Y + 11, "text-anchor": "end", class: "svg-note", text: "🌡" }, wallSvg);
+
+      // 温度折线: 室外空气 → 外表面 (对流温降) → 各界面 → 库内空气
+      const ptsX = [30, X0, ...xs.slice(1), 930];
+      const ptsT = [state.tO, r.T[1], ...r.Rs.map((_, i) => r.T[i + 2]), state.tI];
+      const pts = ptsX.map((x, i) => `${x},${ty(ptsT[i])}`).join(" ");
+      svgEl("polyline", { points: pts, fill: "none", stroke: "#ffcf9e", "stroke-width": 2.5,
+        "stroke-linejoin": "round", filter: "drop-shadow(0 0 5px rgba(255,150,80,0.55))" }, wallSvg);
+      ptsX.forEach((x, i) => {
+        if (i === 0 || i === ptsX.length - 1) return;
+        svgEl("circle", { cx: x, cy: ty(ptsT[i]), r: 3.4, fill: "#ffe6cd", stroke: "#e0561f", "stroke-width": 1.4 }, wallSvg);
+        svgEl("text", { x, y: ty(ptsT[i]) - 9, "text-anchor": "middle", class: "svg-note",
+          fill: "#ffd9b8", text: fmt(ptsT[i], 1) + "°" }, wallSvg);
+      });
+
+      // 拖拽手柄 (层与层之间 + 最内边界)
+      for (let i = 1; i <= state.layers.length; i++) {
+        const hx = xs[i];
+        const h = svgEl("g", { class: "drag-handle", "data-b": i }, wallSvg);
+        svgEl("rect", { x: hx - 7, y: YTOP, width: 14, height: YBOT - YTOP }, h);
+        svgEl("line", { x1: hx, y1: YTOP - 8, x2: hx, y2: YBOT + 6 }, h);
+        attachDrag(h, i - 1);
+      }
+
+      // 热流方向箭头
+      svgEl("text", { x: 480, y: 40, "text-anchor": "middle", class: "svg-note", fill: "#ff9a5c",
+        "font-size": "13", text: "热流 q ⟶ (室外 → 库内)" }, wallSvg);
+    }
+
+    function attachDrag(handle, layerIdx) {
+      handle.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        handle.classList.add("dragging");
+        const L = state.layers[layerIdx];
+        const startX = e.clientX, startD = L.d;
+        const pxPerUnit = wallSvg.getBoundingClientRect().width / 960;
+        const move = (ev) => {
+          const dmm = (ev.clientX - startX) / pxPerUnit / (layout.k || 1);
+          L.d = Math.round(clamp(startD + dmm, L.min, L.max));
+          $("#d" + layerIdx).value = L.d;
+          $("#d" + layerIdx + "Out").textContent = L.d + " mm";
+          update();
+        };
+        const up = () => {
+          handle.classList.remove("dragging");
+          removeEventListener("pointermove", move);
+          removeEventListener("pointerup", up);
+        };
+        addEventListener("pointermove", move);
+        addEventListener("pointerup", up);
+      });
+    }
+
+    // ---------------- 热阻梯子 ----------------
+    function renderLadder(r) {
+      ladderSvg.innerHTML = "";
+      const items = [
+        { name: "R_o 外表面", R: r.Ro, color: "#e0561f", tag: -2 },
+        ...state.layers.map((L, i) => ({ name: MATS[L.mat].name, R: r.Rs[i], color: MATS[L.mat].color, tag: i })),
+        { name: "R_i 内表面", R: r.Ri, color: "#1f7fd4", tag: -3 },
+      ];
+      const MINW = 30, avail = 800;
+      let flexR = 0, fixedW = 0;
+      const raw = items.map((it) => (it.R / r.Rtot) * avail);
+      items.forEach((it, i) => { if (raw[i] < MINW) fixedW += MINW; else flexR += it.R; });
+      const kk = (avail - fixedW) / flexR;
+      let x = 80;
+      const midY = 58;
+      svgEl("line", { x1: 30, y1: midY, x2: 80, y2: midY, stroke: "#8fa9c7", "stroke-width": 2 }, ladderSvg);
+      svgEl("text", { x: 30, y: midY - 12, class: "svg-note", fill: "#ffb28a", text: `t_o=${state.tO}℃` }, ladderSvg);
+      items.forEach((it, i) => {
+        const w = raw[i] < MINW ? MINW : it.R * kk;
+        const g = svgEl("g", { class: "res-seg" + (hover === it.tag ? " hl" : "") }, ladderSvg);
+        svgEl("rect", { x, y: midY - 13, width: w, height: 26, rx: 5, fill: it.color, opacity: 0.85,
+          stroke: "rgba(8,12,20,0.8)" }, g);
+        if (w > 52) svgEl("text", { x: x + w / 2, y: midY + 4, "text-anchor": "middle", class: "svg-note",
+          fill: "#0d141f", "font-weight": "700", text: `R=${fmt(it.R, it.R < 0.01 ? 4 : 3)}` }, g);
+        svgEl("text", { x: x + w / 2, y: midY + 34, "text-anchor": "middle", class: "svg-note", text: it.name }, g);
+        if (it.tag >= 0) {
+          g.addEventListener("mouseenter", () => { hover = it.tag; update(); });
+          g.addEventListener("mouseleave", () => { hover = -1; update(); });
+        }
+        x += w;
+      });
+      svgEl("line", { x1: x, y1: midY, x2: x + 50, y2: midY, stroke: "#8fa9c7", "stroke-width": 2 }, ladderSvg);
+      svgEl("text", { x: x + 8, y: midY - 12, class: "svg-note", fill: "#9fd4ff", text: `t_i=${state.tI}℃` }, ladderSvg);
+      svgEl("text", { x: 480, y: 116, "text-anchor": "middle", class: "svg-note",
+        text: `串联总热阻 R_total = ${fmt(r.Rtot, 3)} m²·K/W —— 保温层一段几乎占满整条梯子,这就是"93%"的由来` }, ladderSvg);
+    }
+
+    // ---------------- 指标与控制 ----------------
+    function renderMetrics(r) {
+      $("#vK").innerHTML = `${fmt(r.K, 3)}<small>W/(m²·K)</small>`;
+      $("#vQ").innerHTML = `${fmt(r.q, 1)}<small>W/m²</small>`;
+      $("#vR").innerHTML = `${fmt(r.Rtot, 2)}<small>m²·K/W</small>`;
+      $("#vTs").innerHTML = `${fmt(r.tSurfIn, 1)}<small>°C</small>`;
+      const bad = r.tSurfIn < r.dew;
+      $("#dewDot").className = "dot " + (bad ? "on" : "ok");
+      $("#dewTxt").textContent = bad
+        ? `内表面 ${fmt(r.tSurfIn, 1)}℃ < 露点 ${fmt(r.dew, 1)}℃,结露!`
+        : `内表面 ${fmt(r.tSurfIn, 1)}℃ ≥ 露点 ${fmt(r.dew, 1)}℃,安全`;
+      $("#dewCard").className = "card " + (bad ? "warn" : "ok");
+    }
+
+    function update() {
+      const r = compute();
+      renderWall(r);
+      renderLadder(r);
+      renderMetrics(r);
+    }
+
+    // 分层控制生成
+    const ctlBox = $("#layerCtls");
+    state.layers.forEach((L, i) => {
+      const row = document.createElement("div");
+      row.className = "ctl-row";
+      row.innerHTML = `
+        <label>${L.label}</label>
+        <select id="m${i}">${Object.entries(MATS).map(([k, m]) =>
+          `<option value="${k}" ${k === L.mat ? "selected" : ""}>${m.name} λ=${m.k}</option>`).join("")}</select>
+        <input type="range" id="d${i}" min="${L.min}" max="${L.max}" step="1" value="${L.d}" class="mono-track" />
+        <output id="d${i}Out">${L.d} mm</output>`;
+      ctlBox.appendChild(row);
+      row.querySelector(`#m${i}`).addEventListener("change", (e) => { L.mat = e.target.value; update(); });
+      bindSlider(`#d${i}`, `#d${i}Out`, (v) => `${v} mm`, (v) => { L.d = v; update(); });
+    });
+
+    bindSlider("#tO", "#tOOut", (v) => `${v} ℃`, (v) => { state.tO = v; update(); });
+    bindSlider("#tI", "#tIOut", (v) => `${v} ℃`, (v) => { state.tI = v; update(); });
+    bindSlider("#hO", "#hOOut", (v) => `${v} W/m²K`, (v) => { state.hO = v; update(); });
+    bindSlider("#hI", "#hIOut", (v) => `${v} W/m²K`, (v) => { state.hI = v; update(); });
+    bindSlider("#rhIn", "#rhInOut", (v) => `${v} %`, (v) => { state.rhIn = v; update(); });
+
+    update();
+  </script>
+</body>
+</html>

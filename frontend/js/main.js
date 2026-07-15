@@ -10,6 +10,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import * as TEX from "./textures.js";
+import { KP_BY_ID } from "../kp/kp-meta.js";
 
 // ---------------------------------------------------------------- 基础
 const scene = new THREE.Scene();
@@ -84,11 +85,21 @@ const keys = {};
 const colliders = [];
 const fans = [];
 
+// 传热学知识点热点: 场景网格 → 知识点 ID 列表 (kp/ 交互教学页)
+const kpTargets = [];
+const CARGO_KP = ["KP08", "KP09", "KP10"];   // 货物: 表面传热 / 非稳态 / 集中参数
+function tagKP(mesh, ids) {
+  mesh.userData.kp = ids;
+  kpTargets.push(mesh);
+  return mesh;
+}
+
 const ui = {};
 ["start", "startBtn", "targetLabel", "doorState", "doorDot", "miniDoor", "miniPlayer",
  "tIn", "rhIn", "tOut", "rhOut", "tProd", "tEvap", "frost", "compDot", "compState",
  "qCool", "qDoor", "qEnv", "power", "cop", "energy", "simClock", "alarmBanner",
- "connDot", "connText", "chart", "defrostBtn", "resetBtn", "spawnBtn"]
+ "connDot", "connText", "chart", "defrostBtn", "resetBtn", "spawnBtn",
+ "kpModal", "kpModalBody", "kpModalClose"]
   .forEach((id) => { ui[id] = document.getElementById(id); });
 
 // ---------------------------------------------------------------- 材质 (程序化贴图)
@@ -218,16 +229,16 @@ function addGround() {
 
 function addColdRoom() {
   const width = 14, depth = 18, height = 6, zc = -4;
-  box(width, 0.18, depth, mats.wall, new THREE.Vector3(0, height, zc));
-  box(0.18, height, depth, mats.wall, new THREE.Vector3(-width / 2, height / 2, zc));
-  box(0.18, height, depth, mats.wall, new THREE.Vector3(width / 2, height / 2, zc));
-  box(width, height, 0.18, mats.wall, new THREE.Vector3(0, height / 2, zc - depth / 2));
+  tagKP(box(width, 0.18, depth, mats.wall, new THREE.Vector3(0, height, zc)), ["KP02"]);
+  tagKP(box(0.18, height, depth, mats.wall, new THREE.Vector3(-width / 2, height / 2, zc)), ["KP01"]);
+  tagKP(box(0.18, height, depth, mats.wall, new THREE.Vector3(width / 2, height / 2, zc)), ["KP01"]);
+  tagKP(box(width, height, 0.18, mats.wall, new THREE.Vector3(0, height / 2, zc - depth / 2)), ["KP01"]);
   // 门洞两侧 + 门楣 (门洞宽 2.6, x -1.3..1.3)
-  box(5.7, height, 0.22, mats.wall, new THREE.Vector3(-4.15, height / 2, zc + depth / 2));
-  box(5.7, height, 0.22, mats.wall, new THREE.Vector3(4.15, height / 2, zc + depth / 2));
-  box(2.7, 2.5, 0.22, mats.wall, new THREE.Vector3(0, 4.75, zc + depth / 2));
+  tagKP(box(5.7, height, 0.22, mats.wall, new THREE.Vector3(-4.15, height / 2, zc + depth / 2)), ["KP01"]);
+  tagKP(box(5.7, height, 0.22, mats.wall, new THREE.Vector3(4.15, height / 2, zc + depth / 2)), ["KP01"]);
+  tagKP(box(2.7, 2.5, 0.22, mats.wall, new THREE.Vector3(0, 4.75, zc + depth / 2)), ["KP01"]);
 
-  box(width - 0.25, 0.06, depth - 0.25, mats.glassIce, new THREE.Vector3(0, 0.04, zc), false, true);
+  tagKP(box(width - 0.25, 0.06, depth - 0.25, mats.glassIce, new THREE.Vector3(0, 0.04, zc), false, true), ["KP03"]);
 
   const ribMat = new THREE.LineBasicMaterial({ color: 0xddefff, transparent: true, opacity: 0.22 });
   for (let x = -6.3; x <= 6.3; x += 0.7) {
@@ -304,6 +315,7 @@ function addRack(x, z) {
       c.position.set(-1.12 + i * 0.56, 0.86 + level * 1.1, -0.18 + (i % 2) * 0.38);
       c.rotation.y = (Math.random() - 0.5) * 0.08;
       c.castShadow = true;
+      tagKP(c, CARGO_KP);
       rack.add(c);
     }
   }
@@ -332,6 +344,7 @@ function addRefrigerantPiping() {
     else if (Math.abs(d.z) > 0.01) m.rotation.x = Math.PI / 2;
     m.castShadow = true;
     scene.add(m);
+    return m;
   };
   const joint = (mat, r, p) => {
     const s = new THREE.Mesh(new THREE.SphereGeometry(r * 1.35, 12, 10), mat);
@@ -341,14 +354,14 @@ function addRefrigerantPiping() {
 
   // 回气管 (保温, DN100): 东墙 -> 西行 -> 折向库尾, 途经两台冷风机上方
   const SR = 0.055;
-  seg(suctionMat, SR, [6.91, 5.62, 3.9], [1.2, 5.62, 3.9]);
-  seg(suctionMat, SR, [1.2, 5.62, 3.9], [1.2, 5.62, -12.3]);
+  tagKP(seg(suctionMat, SR, [6.91, 5.62, 3.9], [1.2, 5.62, 3.9]), ["KP11"]);
+  tagKP(seg(suctionMat, SR, [1.2, 5.62, 3.9], [1.2, 5.62, -12.3]), ["KP11"]);
   [[1.2, 5.62, 3.9], [1.2, 5.62, -3.9], [1.2, 5.62, -12.15]].forEach((p) => joint(suctionMat, SR, p));
 
   // 供液管 (铜, DN25): 与回气管并行
   const LR = 0.026;
-  seg(liquidMat, LR, [6.91, 5.56, 3.72], [1.0, 5.56, 3.72]);
-  seg(liquidMat, LR, [1.0, 5.56, 3.72], [1.0, 5.56, -12.3]);
+  tagKP(seg(liquidMat, LR, [6.91, 5.56, 3.72], [1.0, 5.56, 3.72]), ["KP11"]);
+  tagKP(seg(liquidMat, LR, [1.0, 5.56, 3.72], [1.0, 5.56, -12.3]), ["KP11"]);
   [[1.0, 5.56, 3.72], [1.0, 5.56, -3.9], [1.0, 5.56, -12.15]].forEach((p) => joint(liquidMat, LR, p));
 
   // 管道吊架: 吊杆 + 横担, 沿走向每 ~2.5m 一处
@@ -510,17 +523,20 @@ function addUnitCoolers() {
     const casing = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), casingMat);
     casing.castShadow = true;
     casing.receiveShadow = true;
+    tagKP(casing, ["KP05", "KP07"]);   // 箱体 → 换热器 + 霜层
     g.add(casing);
 
     FAN_XS.forEach((fx) => {
       // 风扇暗色凹腔背景
       const recess = new THREE.Mesh(new THREE.CircleGeometry(R - 0.01, 28), recessMat);
       recess.position.set(fx, 0, front + 0.005);
+      tagKP(recess, ["KP06"]);         // 风扇区 → 强制对流
       g.add(recess);
       // 短风筒 + 前沿包边
       const duct = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 0.22, 30, 1, true), ringMat);
       duct.rotation.x = Math.PI / 2;
       duct.position.set(fx, 0, front + 0.11);
+      tagKP(duct, ["KP06"]);
       g.add(duct);
       const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.028, 10, 36), ringMat);
       rim.position.set(fx, 0, front + 0.22);
@@ -798,6 +814,7 @@ function buildDoor() {
   slab.castShadow = true;
   slab.receiveShadow = true;
   slab.userData.interactive = "door";
+  tagKP(slab, ["KP04"]);
   doorGroup.add(slab);
   doorSlabMesh = slab;
 
@@ -881,6 +898,7 @@ function buildDynamicBodies(manifest) {
     mesh.visible = !b.pool;
     mesh.userData.bodyName = b.name;
     mesh.userData.grabbable = true;
+    mesh.userData.kp = CARGO_KP;       // 动态货箱同属货物类知识点
     scene.add(mesh);
     dynMeshes.push(mesh);
     dynTargets.push({ p: new THREE.Vector3(), q: new THREE.Quaternion(), init: false });
@@ -1084,6 +1102,7 @@ function triggerManualAlarm() {
   }
 }
 
+let currentKp = null;          // 准星所指部位的知识点 ID 列表
 function checkCrosshair() {
   raycaster.setFromCamera(CENTER, camera);
   raycaster.far = 3.4;
@@ -1096,14 +1115,62 @@ function checkCrosshair() {
     else if (m.userData.interactive === "alarm") currentTarget = { kind: "alarm", mesh: m };
     else if (m.userData.grabbable) currentTarget = { kind: "body", mesh: m };
   }
+
+  // 第二道射线: 传热学知识点热点 (更远, 覆盖屋面/吊顶管线)
+  raycaster.far = 9.5;
+  const kpHits = raycaster.intersectObjects(
+    [...kpTargets, ...dynMeshes.filter((m) => m.visible)], false);
+  currentKp = kpHits.length ? (kpHits[0].object.userData.kp || null) : null;
+
   let label = "";
   if (performance.now() < noteUntil) label = noteText;
   else if (heldName) label = "按 F 放下 · 左键投掷";
   else if (currentTarget?.kind === "door") label = doorTarget.d > 0.4 ? "按 E 关门" : "按 E 开门";
   else if (currentTarget?.kind === "alarm") label = "按 E 触发紧急报警";
   else if (currentTarget?.kind === "body") label = "按 F 抓取";
+
+  if (currentKp && performance.now() >= noteUntil) {
+    const first = KP_BY_ID[currentKp[0]];
+    const kpHint = currentKp.length > 1
+      ? `Q 传热知识 (${currentKp.length} 项)`
+      : `Q 传热知识 · ${first ? first.title : currentKp[0]}`;
+    label = label ? `${label} · ${kpHint}` : `按 ${kpHint}`;
+  }
   ui.targetLabel.textContent = label;
   ui.targetLabel.classList.toggle("active", Boolean(label));
+}
+
+// ---------------------------------------------------------------- 知识点浮窗
+let kpModalOpen = false;
+function openKpModal(ids) {
+  ui.kpModalBody.innerHTML = ids.map((id) => {
+    const k = KP_BY_ID[id];
+    if (!k) return "";
+    return `
+      <div class="kp-pop-card">
+        <div class="kp-pop-head">
+          <span class="kp-pop-id">${k.id}</span>
+          <span class="kp-pop-title">${k.title}</span>
+          <span class="kp-pop-cat">${k.cat}</span>
+        </div>
+        <div class="kp-pop-formula">${k.formula}</div>
+        <p class="kp-pop-brief">${k.brief}</p>
+        <a class="kp-pop-go" href="./kp/${k.file}" target="_blank" rel="opener">进入交互页 →</a>
+      </div>`;
+  }).join("");
+  kpModalOpen = true;
+  ui.kpModal.classList.add("active");
+  controls.unlock();
+}
+
+function closeKpModal(relock) {
+  kpModalOpen = false;
+  ui.kpModal.classList.remove("active");
+  if (relock) controls.lock();
+  else {
+    ui.start.style.display = "grid";
+    ui.start.classList.add("compact");
+  }
 }
 
 document.addEventListener("keydown", (e) => {
@@ -1113,6 +1180,9 @@ document.addEventListener("keydown", (e) => {
     case "KeyE":
       if (currentTarget?.kind === "door") send({ c: "door" });
       else if (currentTarget?.kind === "alarm") triggerManualAlarm();
+      break;
+    case "KeyQ":
+      if (controls.isLocked && currentKp) openKpModal(currentKp);
       break;
     case "KeyF": {
       const pd = camPosDir();
@@ -1345,9 +1415,18 @@ function animate() {
 ui.startBtn.addEventListener("click", () => controls.lock());
 controls.addEventListener("lock", () => { ui.start.style.display = "none"; });
 controls.addEventListener("unlock", () => {
+  ui.startBtn.textContent = "继续巡检";
+  if (kpModalOpen) return;             // 知识点浮窗打开时不弹"继续巡检"遮罩
   ui.start.style.display = "grid";
   ui.start.classList.add("compact");
-  ui.startBtn.textContent = "继续巡检";
+});
+
+ui.kpModalClose.addEventListener("click", () => closeKpModal(true));
+ui.kpModal.addEventListener("mousedown", (e) => {
+  if (e.target === ui.kpModal) closeKpModal(true);   // 点击遮罩空白处关闭
+});
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Escape" && kpModalOpen) closeKpModal(false);
 });
 
 addEventListener("resize", () => {

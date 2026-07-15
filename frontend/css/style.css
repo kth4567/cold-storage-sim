@@ -366,6 +366,113 @@ canvas.webgl {
 
 #connDot.ok i { background: #31d05a; box-shadow: 0 0 10px #31d05a; }
 
+/* ------------------------------------------------ 传热知识点浮窗 */
+#kpModal {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  display: none;
+  place-items: center;
+  background: rgba(4, 8, 14, 0.68);
+  backdrop-filter: blur(6px);
+}
+
+#kpModal.active { display: grid; }
+
+.kp-modal-card {
+  width: min(560px, 92vw);
+  max-height: 84vh;
+  overflow-y: auto;
+  border: 1px solid rgba(150, 200, 255, 0.3);
+  border-radius: 12px;
+  background: rgba(9, 15, 25, 0.94);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+  padding: 16px 20px 20px;
+}
+
+.kp-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(210, 230, 255, 0.16);
+}
+
+.kp-modal-head h2 { margin: 0; font-size: 17px; flex: 1; }
+
+.kp-modal-hub {
+  font-size: 12px;
+  color: #8fc2f5;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.kp-modal-hub:hover { color: #c4e2ff; }
+
+#kpModalClose {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(160, 200, 255, 0.3);
+  border-radius: 7px;
+  background: rgba(28, 48, 76, 0.6);
+  color: #dbeaff;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#kpModalClose:hover { background: rgba(50, 84, 128, 0.8); }
+
+.kp-pop-card {
+  border: 1px solid rgba(140, 190, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(14, 24, 40, 0.75);
+  padding: 13px 16px;
+  margin-bottom: 12px;
+}
+
+.kp-pop-head { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+
+.kp-pop-id {
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  color: #6fb3ec;
+  letter-spacing: 1px;
+}
+
+.kp-pop-title { font-size: 15.5px; font-weight: 700; }
+
+.kp-pop-cat {
+  font-size: 11px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 150, 80, 0.4);
+  color: #ffce9f;
+}
+
+.kp-pop-formula {
+  font-family: Consolas, monospace;
+  font-size: 12.5px;
+  color: #ffd9b3;
+  margin: 7px 0 2px;
+}
+
+.kp-pop-brief { margin: 6px 0 10px; font-size: 12.8px; color: #c2d5ea; line-height: 1.65; }
+
+.kp-pop-go {
+  display: inline-block;
+  padding: 6px 15px;
+  border: 1px solid rgba(114, 181, 255, 0.55);
+  border-radius: 7px;
+  background: rgba(22, 62, 110, 0.75);
+  color: #eaf5ff;
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.kp-pop-go:hover { background: rgba(35, 88, 150, 0.9); }
+
 @media (max-width: 900px) {
   #environment, #chartBox { display: none; }
   #controls { bottom: 16px; }

@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./kp.css" />
+  <style>
+    .route-box {
+      flex: 1; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--line);
+      background: rgba(13, 22, 36, 0.7); transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+      opacity: 0.45;
+    }
+    .route-box.lit { opacity: 1; border-color: var(--line-strong); box-shadow: 0 0 22px rgba(83, 193, 255, 0.18); }
+    .route-box h4 { margin: 0 0 6px; font-size: 14.5px; }
+    .route-box p { margin: 0 0 10px; font-size: 12.3px; color: #b7cbe2; }
+    .route-box a {
+      display: inline-block; padding: 6px 14px; border-radius: 7px; font-size: 12.5px;
+      border: 1px solid rgba(114, 181, 255, 0.5); background: rgba(22, 62, 110, 0.7);
+      color: #eaf5ff; text-decoration: none;
+    }
+    .beam { transition: transform 0.45s cubic-bezier(0.34, 1.4, 0.64, 1); }
+  </style>
+</head>
+<body data-kp="KP08">
+  <div class="kp-wrap" id="wrap">
+
+    <div class="panel viz-box">
+      <h3>降温接力:冷风 → 表面 → 中心 <small>两段热阻串联,交接点在货物表面</small></h3>
+      <svg id="relaySvg" viewBox="0 0 960 250" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="panel viz-box">
+      <h3>Bi 热阻跷跷板 <small>左臂 1/h(表面对流) vs 右臂 L<sub>c</sub>/λ(内部导热)——往哪边倾,瓶颈就在哪边</small></h3>
+      <svg id="seesawSvg" viewBox="0 0 960 300" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="hintline">💡 <b>核心体验</b>:加大风速 h,左臂变短,跷跷板右倾——内部导热成为瓶颈,再加风也没用;把货物分装变小,右臂缩短,Bi 掉下来,降温方法都跟着换。</div>
+    </div>
+
+    <div class="kp-grid main-side">
+      <div class="panel">
+        <h3>参数控制</h3>
+        <div class="ctl-row">
+          <label>表面 h(风速)</label>
+          <input type="range" id="h" min="3" max="60" step="0.5" value="30" />
+          <output id="hOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>货物半径 R(球)</label>
+          <input type="range" id="r" min="0.005" max="0.3" step="0.005" value="0.1" class="mono-track" />
+          <output id="rOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>货物 λ</label>
+          <input type="range" id="lam" min="0.2" max="2.5" step="0.05" value="0.5" class="mono-track" />
+          <output id="lamOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>包装层(3mm 纸箱)</label>
+          <button class="kbtn" id="packBtn">无包装</button>
+        </div>
+        <div class="ctl-row" style="gap:8px">
+          <label>例题预设</label>
+          <button class="kbtn" data-preset="0.1">大货 R=0.1</button>
+          <button class="kbtn" data-preset="0.02">分装 R=0.02</button>
+          <button class="kbtn" data-preset="0.005">R=5mm</button>
+        </div>
+        <div class="cards" style="margin-top:12px">
+          <div class="card"><div class="lbl">表面对流热阻 1/h</div><div class="val" id="vRc">--<small>m²K/W</small></div></div>
+          <div class="card"><div class="lbl">内部导热热阻 L<sub>c</sub>/λ</div><div class="val" id="vRk">--<small>m²K/W</small></div></div>
+          <div class="card hot"><div class="lbl">Bi = h·L<sub>c</sub>/λ</div><div class="val" id="vBi">--</div></div>
+          <div class="card" id="botCard"><div class="lbl">当前瓶颈</div><div class="val" id="vBot" style="font-size:15px">--</div></div>
+        </div>
+        <div class="formula">Bi = h·L<sub>c</sub>/λ<sub>goods</sub>(球取 L<sub>c</sub>=R/3;λ 用货物的,不是空气的!)</div>
+      </div>
+
+      <div class="panel">
+        <h3>归宿判据 · 分流路由器</h3>
+        <svg id="gaugeSvg" viewBox="0 0 620 120" preserveAspectRatio="xMidYMid meet" style="width:100%"></svg>
+        <div style="display:flex;gap:12px;margin-top:10px">
+          <div class="route-box" id="routeLump">
+            <h4>Bi &lt; 0.1 → 集中参数法</h4>
+            <p>内部热阻可忽略,整块货物均匀降温,一条单指数曲线搞定。</p>
+            <a href="./kp10.html">进入 KP10 →</a>
+          </div>
+          <div class="route-box" id="routeTrans">
+            <h4>Bi &gt; 0.1 → 非稳态导热</h4>
+            <p>内部导热是瓶颈,表面先冷、中心明显滞后,须查 Heisler 图/级数解。</p>
+            <a href="./kp09.html">进入 KP09 →</a>
+          </div>
+        </div>
+        <div class="hintline" style="margin-top:12px">这是全部 11 个知识点里的<b>核心分叉口</b>:先判 Bi,再选方法——正确的解题流程从这里养成。</div>
+      </div>
+    </div>
+
+    <details class="knowledge">
+      <summary>知识速览 —— 表面传热与 Bi 判据</summary>
+      <div class="kbody">
+        <h4>物理图景</h4>
+        <p>货物降温是一场两棒接力:第一棒,表面对流把热量交给冷风(热阻 1/h);第二棒,内部导热把热量送到表面(热阻 L<sub>c</sub>/λ)。
+          总速度由<b>慢的那一棒</b>决定——Bi 数就是两段热阻之比,它告诉你瓶颈在哪。</p>
+        <h4>核心判据</h4>
+        <p>Bi = h·L<sub>c</sub>/λ<sub>goods</sub>。Bi≪1:表面换热慢,内部近乎均温 → 集中参数法(KP10);
+          Bi≫1:内部导热慢,表面瞬间贴近风温、中心长时间滞后 → 非稳态导热(KP09)。工程阈值取 0.1。</p>
+        <h4>典型数值(本页默认参数即此例)</h4>
+        <p>球形货物 R=0.1m、λ=0.5、h=30:L<sub>c</sub>=R/3=0.033m,Bi=<b>2.0</b>≫0.1,不能用集中参数;
+          分装成 R=0.02m 后 Bi=0.4,再小到 R=5mm 才临界——<b>减小尺寸比一味加风更能加快中心降温</b>。</p>
+        <h4>常见误区</h4>
+        <p class="trap">Bi 里的 λ 用成空气的——Bi 用货物 λ(内部热阻),Nu 才用流体 λ。</p>
+        <p class="trap">加大风速总能加快降温?——Bi 大时瓶颈在内部,提 h 收益锐减。</p>
+        <p class="trap">表面温度=风温?——只有 Bi 很大时才近似成立,一般介于风温与中心温之间。</p>
+        <h4>与其他知识点</h4>
+        <p>h 来自 KP04/KP06;Bi&gt;0.1 走 KP09,Bi&lt;0.1 走 KP10;包装层是表面外又一层串联热阻;表面同时是干耗/结露的传质界面。</p>
+      </div>
+    </details>
+  </div>
+
+  <script type="module">
+    import { initPage, svgEl, $, $$, fmt, clamp, scale, tempColor, bindSlider } from "./kp-common.js";
+    initPage();
+
+    const state = { h: 30, R: 0.1, lam: 0.5, pack: false };
+    const T_AIR = -18, T_CENTER = 5;
+    const PACK_R = 0.003 / 0.06;         // 3mm 纸箱 λ=0.06 → 0.05 m²K/W
+
+    function compute() {
+      const Lc = state.R / 3;
+      const Rconv = 1 / state.h;
+      const Rcond = Lc / state.lam + (state.pack ? PACK_R : 0);
+      const Bi = Rcond / Rconv;
+      const Ts = T_AIR + (T_CENTER - T_AIR) * (Rconv / (Rconv + Rcond));
+      return { Lc, Rconv, Rcond, Bi, Ts };
+    }
+
+    // ---------------- 接力路径 ----------------
+    const relay = $("#relaySvg");
+    function drawRelay(r) {
+      relay.innerHTML = "";
+      // 冷风区
+      svgEl("rect", { x: 20, y: 40, width: 210, height: 170, rx: 10, fill: "rgba(20,60,110,0.35)" }, relay);
+      svgEl("text", { x: 125, y: 70, "text-anchor": "middle", class: "svg-note", fill: "#9fd4ff",
+        "font-size": "14", text: `冷风 ${T_AIR}℃` }, relay);
+      for (let i = 0; i < 3; i++) {
+        svgEl("line", { x1: 45, y1: 105 + i * 32, x2: 175, y2: 105 + i * 32,
+          stroke: "rgba(140,205,255,0.5)", "stroke-width": 2 }, relay);
+        svgEl("path", { d: `M175,${100 + i * 32} l14,5 l-14,5 z`, fill: "rgba(140,205,255,0.6)" }, relay);
+      }
+      // 对流膜 (厚度 ∝ 1/h 相对感)
+      const filmW = clamp(1 / state.h * 900, 8, 70);
+      svgEl("rect", { x: 320 - filmW, y: 45, width: filmW, height: 160, fill: "rgba(110,190,255,0.25)" }, relay);
+      svgEl("text", { x: 320 - filmW / 2, y: 32, "text-anchor": "middle", class: "svg-note", fill: "#8fc2f0",
+        text: `对流膜 1/h` }, relay);
+      svgEl("text", { x: 250, y: 232, class: "svg-note", fill: "#8fc2f0", text: "第一棒:表面对流" }, relay);
+      // 货物剖面 (半圆多环: 表面→中心色带)
+      const cx = 620, cy = 125, RR = 105;
+      const n = 24;
+      for (let i = n; i >= 1; i--) {
+        const frac = i / n;                      // 1=表面 0=中心
+        const t = r.Ts + (T_CENTER - r.Ts) * (1 - frac) ** 1.5;
+        svgEl("circle", { cx, cy, r: RR * frac, fill: tempColor(t, -20, 10) }, relay);
+      }
+      svgEl("circle", { cx, cy, r: RR, fill: "none", stroke: "#dceafc", "stroke-width": 1.5 }, relay);
+      svgEl("circle", { cx, cy, r: 4, fill: "#fff" }, relay);
+      svgEl("text", { x: cx, y: cy - RR - 12, "text-anchor": "middle", class: "svg-note",
+        text: `货物剖面 R=${fmt(state.R * 100, 1)}cm${state.pack ? " + 包装" : ""}` }, relay);
+      if (state.pack) svgEl("circle", { cx, cy, r: RR + 6, fill: "none", stroke: "#c9a04a", "stroke-width": 5, opacity: 0.8 }, relay);
+      svgEl("text", { x: cx + RR + 16, y: cy - 34, class: "svg-note", fill: "#ffd9b8",
+        text: `表面 ${fmt(r.Ts, 1)}℃` }, relay);
+      svgEl("text", { x: cx + RR + 16, y: cy + 44, class: "svg-note", fill: "#ffb28a",
+        text: `中心 ${T_CENTER}℃ (滞后)` }, relay);
+      svgEl("line", { x1: cx + RR + 12, y1: cy - 40, x2: cx + RR * 0.75, y2: cy - 30, stroke: "rgba(255,220,180,0.5)" }, relay);
+      svgEl("line", { x1: cx + RR + 12, y1: cy + 40, x2: cx + 8, y2: cy + 6, stroke: "rgba(255,180,140,0.5)" }, relay);
+      svgEl("text", { x: cx, y: 245, "text-anchor": "middle", class: "svg-note", fill: "#ffcf9e",
+        text: "第二棒:内部导热 Lc/λ" }, relay);
+    }
+
+    // ---------------- 跷跷板 ----------------
+    const ss = $("#seesawSvg");
+    function drawSeesaw(r) {
+      ss.innerHTML = "";
+      const cx = 480, cy = 200;
+      // 支点
+      svgEl("path", { d: `M${cx - 34},${cy + 62} L${cx},${cy} L${cx + 34},${cy + 62} Z`,
+        fill: "#39516d", stroke: "#6e93bd" }, ss);
+      svgEl("text", { x: cx, y: cy + 84, "text-anchor": "middle", class: "svg-note", text: "支点 = 比较" }, ss);
+      // 横杆 (倾角 ∝ log10 Bi)
+      const tilt = clamp(Math.log10(Math.max(r.Bi, 1e-4)) * 13, -26, 26);
+      const g = svgEl("g", { class: "beam", transform: `rotate(${tilt} ${cx} ${cy})` }, ss);
+      svgEl("rect", { x: cx - 330, y: cy - 7, width: 660, height: 12, rx: 6, fill: "#8fa9c7" }, g);
+      // 左砝码 1/h (表面对流热阻)
+      const wl = clamp(Math.sqrt(r.Rconv) * 300, 30, 110);
+      svgEl("rect", { x: cx - 300 - wl / 2, y: cy - 16 - wl, width: wl, height: wl, rx: 8,
+        fill: "#53c1ff", opacity: 0.88, stroke: "rgba(8,12,20,0.7)" }, g);
+      svgEl("text", { x: cx - 300, y: cy - 16 - wl / 2, "text-anchor": "middle", class: "svg-note",
+        fill: "#0d141f", "font-weight": "700", text: "1/h" }, g);
+      svgEl("text", { x: cx - 300, y: cy - 26 - wl, "text-anchor": "middle", class: "svg-note",
+        fill: "#9fd4ff", text: `${fmt(r.Rconv, 3)}` }, g);
+      // 右砝码 Lc/λ
+      const wr = clamp(Math.sqrt(r.Rcond) * 300, 30, 110);
+      svgEl("rect", { x: cx + 300 - wr / 2, y: cy - 16 - wr, width: wr, height: wr, rx: 8,
+        fill: "#ff9a5c", opacity: 0.88, stroke: "rgba(8,12,20,0.7)" }, g);
+      svgEl("text", { x: cx + 300, y: cy - 16 - wr / 2, "text-anchor": "middle", class: "svg-note",
+        fill: "#0d141f", "font-weight": "700", text: state.pack ? "Lc/λ+包装" : "Lc/λ" }, g);
+      svgEl("text", { x: cx + 300, y: cy - 26 - wr, "text-anchor": "middle", class: "svg-note",
+        fill: "#ffcf9e", text: `${fmt(r.Rcond, 3)}` }, g);
+      // 臂标签
+      svgEl("text", { x: cx - 150, y: cy + 26, "text-anchor": "middle", class: "svg-note", fill: "#9fd4ff",
+        text: "表面对流热阻(外)" }, g);
+      svgEl("text", { x: cx + 150, y: cy + 26, "text-anchor": "middle", class: "svg-note", fill: "#ffcf9e",
+        text: "内部导热热阻(内)" }, g);
+      // Bi 大字
+      svgEl("text", { x: cx, y: 64, "text-anchor": "middle", "font-size": "34",
+        "font-family": "Consolas, monospace", "font-weight": "700",
+        fill: r.Bi > 0.1 ? "#ffb36b" : "#7fdcff", text: `Bi = ${fmt(r.Bi, r.Bi < 1 ? 2 : 1)}` }, ss);
+      svgEl("text", { x: cx, y: 88, "text-anchor": "middle", class: "svg-note",
+        text: r.Bi > 1 ? "右倾:内部导热拖后腿 → 中心滞后" : r.Bi > 0.1 ? "略偏内部:两段都不可忽略" : "左倾:表面换热是瓶颈 → 整体同步降温" }, ss);
+    }
+
+    // ---------------- 判据条 ----------------
+    const gauge = $("#gaugeSvg");
+    function drawGauge(r) {
+      gauge.innerHTML = "";
+      const X = scale([-3, 2], [40, 580]);      // log10 Bi
+      const defs = svgEl("defs", {}, gauge);
+      const grad = svgEl("linearGradient", { id: "gg", x1: 0, x2: 1 }, defs);
+      svgEl("stop", { offset: 0, "stop-color": "#1f7fd4" }, grad);
+      svgEl("stop", { offset: 0.4, "stop-color": "#3a86b8" }, grad);
+      svgEl("stop", { offset: 0.6, "stop-color": "#c96f35" }, grad);
+      svgEl("stop", { offset: 1, "stop-color": "#e0561f" }, grad);
+      svgEl("rect", { x: 40, y: 46, width: 540, height: 16, rx: 8, fill: "url(#gg)", opacity: 0.8 }, gauge);
+      [[-3, "0.001"], [-2, "0.01"], [-1, "0.1"], [0, "1"], [1, "10"], [2, "100"]].forEach(([e, t]) => {
+        svgEl("line", { x1: X(e), y1: 62, x2: X(e), y2: 70, stroke: "#6e93bd" }, gauge);
+        svgEl("text", { x: X(e), y: 84, "text-anchor": "middle", class: "svg-note", text: t }, gauge);
+      });
+      // 0.1 阈值
+      svgEl("line", { x1: X(-1), y1: 30, x2: X(-1), y2: 66, stroke: "#ffe6cd", "stroke-width": 2, "stroke-dasharray": "4 3" }, gauge);
+      svgEl("text", { x: X(-1), y: 22, "text-anchor": "middle", class: "svg-note", fill: "#ffe6cd", text: "判据阈值 0.1" }, gauge);
+      svgEl("text", { x: 60, y: 26, class: "svg-note", fill: "#9fd4ff", text: "← 集中参数 KP10" }, gauge);
+      svgEl("text", { x: 560, y: 26, "text-anchor": "end", class: "svg-note", fill: "#ffcf9e", text: "非稳态·中心滞后 KP09 →" }, gauge);
+      // 指针
+      const px = X(clamp(Math.log10(Math.max(r.Bi, 1e-4)), -3, 2));
+      svgEl("path", { d: `M${px},44 l-7,-13 h14 z`, fill: "#fff" }, gauge);
+      svgEl("text", { x: px, y: 108, "text-anchor": "middle", class: "svg-note", fill: "#fff",
+        text: `Bi=${fmt(r.Bi, 2)}` }, gauge);
+    }
+
+    function update() {
+      const r = compute();
+      drawRelay(r);
+      drawSeesaw(r);
+      drawGauge(r);
+      $("#vRc").innerHTML = `${fmt(r.Rconv, 3)}<small>m²K/W</small>`;
+      $("#vRk").innerHTML = `${fmt(r.Rcond, 3)}<small>m²K/W</small>`;
+      $("#vBi").textContent = fmt(r.Bi, 2);
+      const lumped = r.Bi < 0.1;
+      $("#vBot").textContent = lumped ? "表面对流(外)" : "内部导热(内)";
+      $("#botCard").className = "card " + (lumped ? "" : "hot");
+      $("#routeLump").classList.toggle("lit", lumped);
+      $("#routeTrans").classList.toggle("lit", !lumped);
+    }
+
+    bindSlider("#h", "#hOut", (v) => `${v} W/m²K`, (v) => { state.h = v; update(); });
+    bindSlider("#r", "#rOut", (v) => `${fmt(v * 100, 1)} cm`, (v) => { state.R = v; update(); });
+    bindSlider("#lam", "#lamOut", (v) => `${fmt(v, 2)} W/mK`, (v) => { state.lam = v; update(); });
+    $("#packBtn").addEventListener("click", () => {
+      state.pack = !state.pack;
+      $("#packBtn").textContent = state.pack ? "有包装 (+0.05)" : "无包装";
+      $("#packBtn").classList.toggle("on", state.pack);
+      update();
+    });
+    $$("button[data-preset]").forEach((b) => b.addEventListener("click", () => {
+      state.R = Number(b.dataset.preset);
+      $("#r").value = state.R;
+      $("#rOut").textContent = `${fmt(state.R * 100, 1)} cm`;
+      update();
+    }));
+
+    update();
+  </script>
+</body>
+</html>

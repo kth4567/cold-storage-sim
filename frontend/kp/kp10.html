@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./kp.css" />
+  <style>
+    .gate {
+      display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+      border-radius: 10px; border: 2px solid; transition: all 0.25s;
+    }
+    .gate.pass { border-color: rgba(52, 208, 106, 0.6); background: rgba(18, 62, 34, 0.35); }
+    .gate.deny { border-color: rgba(255, 92, 74, 0.7); background: rgba(80, 18, 10, 0.4); }
+    .gate .icon { font-size: 34px; }
+    .gate .big { font-family: var(--mono); font-size: 24px; font-weight: 700; }
+    .gate.pass .big { color: #7fe3a8; }
+    .gate.deny .big { color: #ff9a86; }
+    .gate a { color: #ffd0c2; font-size: 12.5px; }
+    #dimmable { transition: opacity 0.3s, filter 0.3s; }
+    #dimmable.off { opacity: 0.35; filter: grayscale(0.8); pointer-events: none; }
+  </style>
+</head>
+<body data-kp="KP10">
+  <div class="kp-wrap" id="wrap">
+
+    <div class="panel">
+      <h3>Bi &lt; 0.1 准入闸门 <small>集中参数法的"门票"——先验票,后进场</small></h3>
+      <div class="gate pass" id="gate">
+        <div class="icon" id="gateIcon">🟢</div>
+        <div style="flex:1">
+          <div class="big" id="gateBi">Bi = 0.06</div>
+          <div class="hintline" style="margin:2px 0 0" id="gateMsg">通过:内部热阻可忽略,整块货物一个温度。</div>
+        </div>
+        <a href="./kp09.html" id="gateLink" style="display:none">被拒?去 KP09 非稳态导热 →</a>
+      </div>
+    </div>
+
+    <div id="dimmable">
+      <div class="kp-grid main-side" style="margin-top:18px">
+        <div class="panel viz-box">
+          <h3>唯一一条曲线:θ* = e<sup>−t/τ</sup> <small>表面=中心=平均,没有第二条线可画</small></h3>
+          <svg id="expSvg" viewBox="0 0 680 380" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="ctl-row">
+            <button class="kbtn hot" id="playBtn">▶ 播放</button>
+            <button class="kbtn" id="resetBtn">↺</button>
+            <input type="range" id="tScrub" min="0" max="780" step="1" value="0" style="flex:2" />
+            <output id="tOut" style="flex:0 0 130px"></output>
+          </div>
+        </div>
+
+        <div class="panel viz-box">
+          <h3>整块一起凉 <small>均匀纯色,无内部渐变——这就是"集中"</small></h3>
+          <svg id="blockSvg" viewBox="0 0 300 420" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+      </div>
+
+      <div class="kp-grid main-side" style="margin-top:18px">
+        <div class="panel">
+          <h3>参数旋钮 → τ = ρVc/(hA) = ρc·L<sub>c</sub>/h</h3>
+          <div class="ctl-row">
+            <label>几何</label>
+            <button class="kbtn on" data-geo="3">球 (L=r/3)</button>
+            <button class="kbtn" data-geo="2">长柱 (r/2)</button>
+            <button class="kbtn" data-geo="1">平板 (半厚)</button>
+          </div>
+          <div class="ctl-row">
+            <label>直径/厚度 d</label>
+            <input type="range" id="d" min="0.003" max="0.06" step="0.001" value="0.006" class="mono-track" />
+            <output id="dOut"></output>
+          </div>
+          <div class="ctl-row">
+            <label>表面 h(风速)</label>
+            <input type="range" id="h" min="5" max="60" step="0.5" value="30" />
+            <output id="hOut"></output>
+          </div>
+          <div class="ctl-row">
+            <label>货物 λ</label>
+            <input type="range" id="lam" min="0.3" max="2" step="0.05" value="0.5" class="mono-track" />
+            <output id="lamOut"></output>
+          </div>
+          <div class="ctl-row">
+            <label>达标温度</label>
+            <input type="range" id="ttgt" min="3" max="15" step="0.5" value="5" />
+            <output id="ttgtOut"></output>
+          </div>
+          <div class="hintline">ρ=1000 kg/m³,c=3900 J/(kg·K)(果蔬典型值);T<sub>i</sub>=25℃,冷风 T<sub>∞</sub>=2℃。</div>
+        </div>
+
+        <div class="panel">
+          <h3>读数台</h3>
+          <div class="cards" style="flex-direction:column">
+            <div class="card"><div class="lbl">特征尺寸 L<sub>c</sub> = V/A</div><div class="val" id="vLc">--<small>mm</small></div></div>
+            <div class="card"><div class="lbl">时间常数 τ(降到 36.8% 的时间)</div><div class="val" id="vTau">--<small>s</small></div></div>
+            <div class="card hot"><div class="lbl">当前温度(整块同温)</div><div class="val" id="vT">--<small>℃</small></div></div>
+            <div class="card ok"><div class="lbl">达标时间 t = −τ·ln θ*</div><div class="val" id="vTgt">--</div></div>
+            <div class="card"><div class="lbl">累计放热 Q(t)</div><div class="val" id="vQ">--<small>kJ</small></div></div>
+          </div>
+          <div class="formula cold-side">θ* = e<sup>−t/τ</sup> = e<sup>−Bi·Fo</sup> —— KP09 在 Bi→0 时的极限</div>
+        </div>
+      </div>
+    </div>
+
+    <details class="knowledge">
+      <summary>知识速览 —— 集中参数法</summary>
+      <div class="kbody">
+        <h4>物理图景</h4>
+        <p>货物足够小/薄、内部导热足够快时,内部温差可忽略——整块只有一个温度,像一支整根下降的水银柱、一只整体排水的桶。
+          数学上与 RC 电路放电完全同构:热容 C<sub>t</sub>=ρVc 通过热阻 R<sub>t</sub>=1/(hA) 放电,τ=R<sub>t</sub>C<sub>t</sub>。</p>
+        <h4>核心公式</h4>
+        <p>θ* = e<sup>−t/τ</sup>,τ = ρVc/(hA) = ρc·L<sub>c</sub>/h;达标时间 t = −τ·lnθ*<sub>tgt</sub>;
+          累计放热 Q(t) = ρVc·ΔT<sub>i</sub>(1−e<sup>−t/τ</sup>)。指数可改写为 e<sup>−Bi·Fo</sup>——正是 KP09 一项近似在 Bi→0 的极限。</p>
+        <h4>典型数值(本页默认参数即此例)</h4>
+        <p>d=6mm 小件(L<sub>c</sub>=1mm)、h=30:Bi=0.06&lt;0.1 ✓;τ=ρcL<sub>c</sub>/h=1000×3900×0.001/30≈<b>130s</b>;
+          25℃→5℃(冷风 2℃):θ*=3/23=0.13,t=−130·ln0.13≈<b>266s≈4.4 分钟</b>。
+          注意:d=5cm 的番茄 Bi=0.5,<b>无权使用本法</b>——闸门会把你请去 KP09。</p>
+        <h4>常见误区</h4>
+        <p class="trap">不查 Bi 就套公式——大块货物强用会严重低估降温时间。</p>
+        <p class="trap">把 τ 当"降到 0"的时间——τ 只是降到 36.8%,近似达标要 3~5 个 τ。</p>
+        <p class="trap">L<sub>c</sub> 混用——判据用 V/A:球=r/3、长柱=r/2、平板=半厚。</p>
+        <h4>与其他知识点</h4>
+        <p>门票由 KP08 的 Bi 判据发放;本页是 KP09 的 Bi→0 极限;h 来自 KP04/KP06;τ 与 KP01 的热阻电路同构(多了热容一维);Q(t) 进热负荷。</p>
+      </div>
+    </details>
+  </div>
+
+  <script type="module">
+    import { initPage, svgEl, $, $$, fmt, clamp, scale, tempColor, bindSlider } from "./kp-common.js";
+    initPage();
+
+    const state = { geoDiv: 3, d: 0.006, h: 30, lam: 0.5, Ttgt: 5, t: 0, playing: false };
+    const RHO = 1000, C = 3900, TI = 25, TINF = 2;
+
+    function compute() {
+      const r = state.d / 2;
+      const Lc = r / state.geoDiv;
+      const Bi = state.h * Lc / state.lam;
+      const tau = RHO * C * Lc / state.h;
+      const thTgt = (state.Ttgt - TINF) / (TI - TINF);
+      const tTgt = -tau * Math.log(thTgt);
+      const V = state.geoDiv === 3 ? (4 / 3) * Math.PI * r ** 3
+        : state.geoDiv === 2 ? Math.PI * r * r * 0.1
+        : 0.1 * 0.1 * state.d;
+      return { Lc, Bi, tau, thTgt, tTgt, V, pass: Bi < 0.1 };
+    }
+
+    const Tof = (tau, t) => TINF + (TI - TINF) * Math.exp(-t / tau);
+
+    // ---------------- 单指数曲线 ----------------
+    const ex = $("#expSvg");
+    function drawExp(r) {
+      ex.innerHTML = "";
+      const tMax = 6 * r.tau;
+      const X = scale([0, tMax], [64, 650]);
+      const Y = scale([0, 1.02], [330, 30]);
+      svgEl("line", { x1: 64, y1: 330, x2: 650, y2: 330, stroke: "#39516d" }, ex);
+      svgEl("line", { x1: 64, y1: 330, x2: 64, y2: 26, stroke: "#39516d" }, ex);
+      // τ/3τ/5τ 网格
+      [[1, "τ"], [3, "3τ"], [5, "5τ"]].forEach(([k, lbl]) => {
+        svgEl("line", { x1: X(k * r.tau), y1: 330, x2: X(k * r.tau), y2: 30,
+          stroke: "rgba(120,170,230,0.18)", "stroke-dasharray": "4 5" }, ex);
+        svgEl("text", { x: X(k * r.tau), y: 348, "text-anchor": "middle", class: "svg-note",
+          fill: "#9fd4ff", text: `${lbl}=${fmt(k * r.tau, 0)}s` }, ex);
+      });
+      // 参考水平线
+      [[1, "100%"], [0.368, "36.8% ← τ 的定义"], [0.05, "5% ≈ 达标"]].forEach(([v, lbl]) => {
+        svgEl("line", { x1: 64, y1: Y(v), x2: 650, y2: Y(v), stroke: "rgba(255,209,102,0.22)", "stroke-dasharray": "3 5" }, ex);
+        svgEl("text", { x: 654, y: Y(v) + 4, class: "svg-note", fill: "#ffe4a3", "font-size": "10", text: lbl }, ex);
+      });
+      // 曲线 (唯一一条!)
+      let d = "";
+      for (let t = 0; t <= tMax; t += tMax / 160) d += (d ? "L" : "M") + X(t) + "," + Y(Math.exp(-t / r.tau));
+      svgEl("path", { d, fill: "none", stroke: "#53c1ff", "stroke-width": 3,
+        filter: "drop-shadow(0 0 6px rgba(83,193,255,0.5))" }, ex);
+      svgEl("text", { x: X(r.tau * 0.5), y: Y(Math.exp(-0.5)) - 14, class: "svg-note", fill: "#9fd4ff",
+        text: "整块货物只有这一条线:表面 = 中心 = 平均" }, ex);
+      // τ 交点
+      svgEl("circle", { cx: X(r.tau), cy: Y(0.368), r: 6, fill: "#ffe6cd", stroke: "#e0561f", "stroke-width": 2 }, ex);
+      // 达标点
+      if (r.tTgt < tMax) {
+        svgEl("circle", { cx: X(r.tTgt), cy: Y(r.thTgt), r: 6, fill: "none", stroke: "#34d06a", "stroke-width": 2.4 }, ex);
+        svgEl("text", { x: X(r.tTgt) + 9, y: Y(r.thTgt) - 9, class: "svg-note", fill: "#7fe3a8",
+          text: `达标 ${fmt(r.tTgt, 0)}s ≈ ${fmt(r.tTgt / 60, 1)}min` }, ex);
+      }
+      // 播放头
+      svgEl("line", { x1: X(Math.min(state.t, tMax)), y1: 330, x2: X(Math.min(state.t, tMax)), y2: 30,
+        stroke: "#ffe6cd", "stroke-width": 1.5 }, ex);
+      svgEl("circle", { cx: X(Math.min(state.t, tMax)), cy: Y(Math.exp(-state.t / r.tau)), r: 5.5,
+        fill: "#53c1ff", stroke: "#fff", "stroke-width": 1.5 }, ex);
+      svgEl("text", { x: 356, y: 372, "text-anchor": "middle", class: "svg-note",
+        text: "调 h 或尺寸,曲线整体横向拉伸/压缩 —— 形状永远是同一条指数" }, ex);
+    }
+
+    // ---------------- 均匀色块 + 温度计 + KP09 对照 ----------------
+    const bl = $("#blockSvg");
+    function drawBlock(r) {
+      bl.innerHTML = "";
+      const th = Math.exp(-state.t / r.tau);
+      const Tn = Tof(r.tau, state.t);
+      const col = tempColor(Tn, TINF, TI);
+      // 均匀球 (纯色, 无渐变!)
+      svgEl("circle", { cx: 96, cy: 110, r: 74, fill: col, stroke: "#dceafc", "stroke-width": 1.5 }, bl);
+      svgEl("text", { x: 96, y: 114, "text-anchor": "middle", "font-size": "17", "font-weight": "700",
+        "font-family": "Consolas", fill: "#10202e", text: `${fmt(Tn, 1)}℃` }, bl);
+      svgEl("text", { x: 96, y: 210, "text-anchor": "middle", class: "svg-note",
+        text: "整块同温 · 无内部渐变" }, bl);
+      // 温度计 (整根水银柱一起降)
+      const tx = 236, ty0 = 40, tH = 150;
+      svgEl("rect", { x: tx - 7, y: ty0, width: 14, height: tH, rx: 7, fill: "#10203a",
+        stroke: "rgba(140,190,255,0.4)" }, bl);
+      const mh = tH * clamp(th, 0.02, 1);
+      svgEl("rect", { x: tx - 4, y: ty0 + tH - mh, width: 8, height: mh, rx: 4, fill: col }, bl);
+      svgEl("circle", { cx: tx, cy: ty0 + tH + 12, r: 13, fill: col }, bl);
+      svgEl("text", { x: tx, y: ty0 + tH + 44, "text-anchor": "middle", class: "svg-note", text: "θ* 水银柱" }, bl);
+      svgEl("text", { x: tx, y: ty0 + tH + 58, "text-anchor": "middle", class: "svg-note",
+        fill: "#9fd4ff", text: `${fmt(th * 100, 0)}%` }, bl);
+      // KP09 对照缩略图 (渐变环)
+      const cy2 = 320;
+      for (let i = 12; i >= 1; i--) {
+        const frac = i / 12;
+        svgEl("circle", { cx: 96, cy: cy2, r: 52 * frac,
+          fill: tempColor(TINF + (TI - TINF) * (1 - frac) * 0.75 + 3, TINF, TI) }, bl);
+      }
+      svgEl("circle", { cx: 96, cy: cy2, r: 52, fill: "none", stroke: "rgba(220,234,252,0.5)" }, bl);
+      svgEl("text", { x: 96, y: cy2 + 74, "text-anchor": "middle", class: "svg-note", fill: "#ffcf9e",
+        text: "对照:KP09 的大块货物" }, bl);
+      svgEl("text", { x: 96, y: cy2 + 89, "text-anchor": "middle", class: "svg-note",
+        text: "有渐变,中心滞后" }, bl);
+      svgEl("text", { x: 236, y: cy2 + 40, "text-anchor": "middle", class: "svg-note", fill: "#7fdcff",
+        text: "这里 ↑" }, bl);
+      svgEl("text", { x: 236, y: cy2 + 56, "text-anchor": "middle", class: "svg-note",
+        text: "整块同温" }, bl);
+    }
+
+    // ---------------- 闸门与读数 ----------------
+    function renderGate(r) {
+      const g = $("#gate");
+      g.className = "gate " + (r.pass ? "pass" : "deny");
+      $("#gateIcon").textContent = r.pass ? "🟢" : "🔴";
+      $("#gateBi").textContent = `Bi = ${fmt(r.Bi, 2)}`;
+      $("#gateMsg").textContent = r.pass
+        ? "通过:内部热阻可忽略,整块货物一个温度,单指数走起。"
+        : "拒绝:Bi ≥ 0.1,内部温差不可忽略——强行套用会严重低估降温时间!";
+      $("#gateLink").style.display = r.pass ? "none" : "";
+      $("#dimmable").classList.toggle("off", !r.pass);
+    }
+
+    function renderMetrics(r) {
+      const Tn = Tof(r.tau, state.t);
+      $("#vLc").innerHTML = `${fmt(r.Lc * 1000, 2)}<small>mm</small>`;
+      $("#vTau").innerHTML = `${fmt(r.tau, 0)}<small>s ≈ ${fmt(r.tau / 60, 1)}min</small>`;
+      $("#vT").innerHTML = `${fmt(Tn, 1)}<small>℃</small>`;
+      $("#vTgt").innerHTML = `${fmt(r.tTgt, 0)}<small>s ≈ ${fmt(r.tTgt / 60, 1)}min (θ*=${fmt(r.thTgt, 2)})</small>`;
+      const Q = RHO * r.V * C * (TI - TINF) * (1 - Math.exp(-state.t / r.tau)) / 1000;
+      $("#vQ").innerHTML = `${fmt(Q, 2)}<small>kJ</small>`;
+      $("#tOut").textContent = `t = ${fmt(state.t, 0)}s`;
+    }
+
+    let cache = compute();
+    function fullUpdate() {
+      cache = compute();
+      $("#tScrub").max = Math.ceil(6 * cache.tau);
+      renderGate(cache);
+      drawExp(cache);
+      drawBlock(cache);
+      renderMetrics(cache);
+    }
+
+    bindSlider("#d", "#dOut", (v) => `${fmt(v * 1000, 0)} mm`, (v) => { state.d = v; fullUpdate(); });
+    bindSlider("#h", "#hOut", (v) => `${v} W/m²K`, (v) => { state.h = v; fullUpdate(); });
+    bindSlider("#lam", "#lamOut", (v) => `${fmt(v, 2)} W/mK`, (v) => { state.lam = v; fullUpdate(); });
+    bindSlider("#ttgt", "#ttgtOut", (v) => `${v} ℃`, (v) => { state.Ttgt = v; fullUpdate(); });
+    bindSlider("#tScrub", "#tOut", (v) => `t = ${fmt(v, 0)}s`, (v) => {
+      state.t = v;
+      drawExp(cache); drawBlock(cache); renderMetrics(cache);
+    });
+    $$("button[data-geo]").forEach((b) => b.addEventListener("click", () => {
+      state.geoDiv = Number(b.dataset.geo);
+      $$("button[data-geo]").forEach((x) => x.classList.toggle("on", x === b));
+      fullUpdate();
+    }));
+    $("#playBtn").addEventListener("click", () => {
+      state.playing = !state.playing;
+      $("#playBtn").textContent = state.playing ? "⏸ 暂停" : "▶ 播放";
+    });
+    $("#resetBtn").addEventListener("click", () => { state.t = 0; $("#tScrub").value = 0; fullUpdate(); });
+
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      if (state.playing && cache.pass) {
+        state.t += dt * cache.tau / 2.2;          // ~13s 播完 6τ
+        if (state.t > 6 * cache.tau) { state.t = 6 * cache.tau; state.playing = false; $("#playBtn").textContent = "▶ 播放"; }
+        $("#tScrub").value = state.t;
+        drawExp(cache); drawBlock(cache); renderMetrics(cache);
+      }
+      requestAnimationFrame(loop);
+    }
+    fullUpdate();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

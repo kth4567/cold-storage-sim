@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./kp.css" />
+  <style>
+    .soil-row { display: flex; gap: 14px; align-items: stretch; }
+    .soil-row .col-profile { flex: 0 0 240px; }
+    .soil-row .col-map { flex: 1 1 auto; min-width: 0; }
+    .soil-row canvas { width: 100%; border-radius: 8px; display: block; }
+    #mapCanvas { cursor: crosshair; }
+    .col-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-family: var(--mono); }
+    @media (max-width: 800px) { .soil-row { flex-direction: column; } .soil-row .col-profile { flex: 1 1 auto; } }
+  </style>
+</head>
+<body data-kp="KP03">
+  <div class="kp-wrap" id="wrap">
+
+    <div class="panel viz-box">
+      <h3>冷量向地下渗透 <small>左:土壤剖面实时温度柱 · 右:深度-时间热力图(点击热力图可跳时间)</small></h3>
+      <div class="soil-row">
+        <div class="col-profile">
+          <div class="col-title">土壤剖面 · 当前时刻</div>
+          <canvas id="profCanvas" width="240" height="400"></canvas>
+        </div>
+        <div class="col-map">
+          <div class="col-title">深度-时间温度场 T(x, t) · 等温线随 √t 张开</div>
+          <canvas id="mapCanvas" width="660" height="400"></canvas>
+        </div>
+      </div>
+      <div class="ctl-row" style="margin-top:14px">
+        <label>时间轴</label>
+        <input type="range" id="day" min="0.1" max="90" step="0.1" value="30" />
+        <output id="dayOut"></output>
+        <button class="kbtn hot" id="playBtn">▶ 播放</button>
+      </div>
+      <div class="hintline">💡 <b>核心体验</b>:播放时间,冷锋往下爬,但越爬越慢——第 1 天就到 1.2m,爬到 4.5m 却要一个月(δ<sub>p</sub> ∝ √t);深处始终滞后。</div>
+    </div>
+
+    <div class="kp-grid main-side">
+      <div class="panel viz-box">
+        <h3>erf(η) 相似解曲线 <small>不同 (x,t) 只要 η 相同,无量纲温度就相同</small></h3>
+        <svg id="erfSvg" viewBox="0 0 720 280" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="ctl-row">
+          <label>探针深度 x</label>
+          <input type="range" id="probe" min="0.1" max="5" step="0.1" value="1" />
+          <output id="probeOut"></output>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>参数与读数</h3>
+        <div class="ctl-row">
+          <label>土壤湿度</label>
+          <input type="range" id="wet" min="0" max="1" step="0.01" value="0.5" class="mono-track" />
+          <output id="wetOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>地表温度 T<sub>s</sub></label>
+          <input type="range" id="ts" min="-30" max="0" step="1" value="-18" />
+          <output id="tsOut"></output>
+        </div>
+        <div class="ctl-row">
+          <label>土壤初温 T<sub>i</sub></label>
+          <input type="range" id="ti" min="5" max="25" step="1" value="15" />
+          <output id="tiOut" class="hot"></output>
+        </div>
+        <div class="cards" style="flex-direction:column;margin-top:12px">
+          <div class="card"><div class="lbl">渗透深度 δp ≈ 4√(αt)</div><div class="val" id="vDp">--<small>m</small></div></div>
+          <div class="card warn"><div class="lbl">0℃ 冰线深度(防冻胀)</div><div class="val" id="vIce">--<small>m</small></div></div>
+          <div class="card"><div class="lbl">探针处温度 T(x,t)</div><div class="val" id="vProbe">--<small>℃</small></div></div>
+          <div class="card hot"><div class="lbl">表面热流 qs ∝ 1/√t</div><div class="val" id="vQs">--<small>W/m²</small></div></div>
+        </div>
+        <div class="formula cold-side">T(x,t) = T<sub>s</sub> + (T<sub>i</sub>−T<sub>s</sub>)·erf(x / 2√(αt))</div>
+      </div>
+    </div>
+
+    <details class="knowledge">
+      <summary>知识速览 —— 半无限大物体导热</summary>
+      <div class="kbody">
+        <h4>物理图景</h4>
+        <p>地坪表面温度突降后,冷量的影响像波前一样向深处扩展:近表面迅速跟随,深处长时间"毫无察觉"。
+          只要边界影响还没到达底部,任何厚物体都可以按"半无限大"处理——这是非稳态导热最干净的解析解。</p>
+        <h4>核心公式</h4>
+        <p>相似变量 η = x / 2√(αt) 把 (x,t) 两个维度压缩成一个;解为 T = T<sub>s</sub> + (T<sub>i</sub>−T<sub>s</sub>)erf(η)。
+          渗透深度 δ<sub>p</sub> ≈ 4√(αt)(η=2 处温度已恢复 99.5%),表面热流 q<sub>s</sub> = λ(T<sub>i</sub>−T<sub>s</sub>)/√(παt) 随时间按 1/√t 衰减。</p>
+        <h4>典型数值(本页默认参数即此例)</h4>
+        <p>T<sub>i</sub>=15℃、T<sub>s</sub>=−18℃、α=0.5×10⁻⁶ m²/s,30 天后:√(αt)=1.138m,1m 深处 η=0.439、erf≈0.466 →
+          T≈<b>−2.6℃</b>(已过冰点,需防冻);渗透深度 δ<sub>p</sub>≈<b>4.55m</b>。</p>
+        <h4>常见误区</h4>
+        <p class="trap">用平壁稳态公式算地坪——地坪是非稳态渗透,温度场随时间变。</p>
+        <p class="trap">以为渗透深度随时间线性增长——是 ∝√t,越往后越慢。</p>
+        <p class="trap">忽视地坪防冻——冻结库冷量长期下渗会冻胀破坏地基,须通风/加热/保温阻断。</p>
+        <h4>与其他知识点</h4>
+        <p>KP09 的一般非稳态在"早期/大物体"极限下退化为本模型;时间足够长后趋向 KP01 的稳态;地下水冻结再耦合相变。</p>
+      </div>
+    </details>
+  </div>
+
+  <script type="module">
+    import { initPage, svgEl, $, fmt, clamp, scale, tempColor, bindSlider, erf, solveBisect } from "./kp-common.js";
+    initPage();
+
+    const state = { day: 30, wet: 0.5, Ts: -18, Ti: 15, probe: 1, playing: false };
+    const DMAX = 6;                 // 剖面最大深度 m
+    const TMAXD = 90;               // 热力图时间范围 天
+
+    const soil = () => ({
+      alpha: (0.25 + state.wet * 0.5) * 1e-6,            // 0.25e-6(干) ~ 0.75e-6(湿), 中点=例题 0.5e-6
+      lambda: 0.8 + state.wet * 1.2,                     // 0.8 ~ 2.0 W/mK
+    });
+
+    const Txt = (x, tSec, alpha) => state.Ts + (state.Ti - state.Ts) * erf(x / (2 * Math.sqrt(alpha * tSec)));
+
+    // ---------------- 土壤剖面 ----------------
+    const prof = $("#profCanvas"), pctx = prof.getContext("2d");
+    function drawProfile() {
+      const { alpha } = soil();
+      const tSec = state.day * 86400;
+      const W = prof.width, H = prof.height;
+      const yOf = (x) => 30 + (x / DMAX) * (H - 40);
+      pctx.clearRect(0, 0, W, H);
+      // 地坪
+      pctx.fillStyle = "#2b3949";
+      pctx.fillRect(0, 12, W, 18);
+      pctx.fillStyle = "#9fd4ff";
+      pctx.font = "12px Consolas";
+      pctx.fillText(`地坪表面 ${state.Ts}℃`, 10, 25);
+      // 温度色柱
+      for (let py = 30; py < H - 10; py++) {
+        const x = ((py - 30) / (H - 40)) * DMAX;
+        pctx.fillStyle = tempColor(Txt(x, tSec, alpha), state.Ts, state.Ti + 4);
+        pctx.fillRect(0, py, W, 1);
+      }
+      // 深度刻度
+      pctx.fillStyle = "rgba(230,240,255,0.7)";
+      pctx.font = "11px Consolas";
+      for (let d = 1; d <= DMAX; d++) {
+        pctx.fillRect(0, yOf(d), 8, 1);
+        pctx.fillText(`-${d}m`, 12, yOf(d) + 4);
+      }
+      // 渗透锋面
+      const dp = 4 * Math.sqrt(alpha * tSec);
+      if (dp < DMAX) {
+        pctx.strokeStyle = "#ffb36b";
+        pctx.setLineDash([6, 5]);
+        pctx.beginPath(); pctx.moveTo(0, yOf(dp)); pctx.lineTo(W, yOf(dp)); pctx.stroke();
+        pctx.setLineDash([]);
+        pctx.fillStyle = "#ffcf9e";
+        pctx.fillText(`渗透锋面 δp=${fmt(dp, 2)}m`, 10, yOf(dp) - 6);
+      }
+      // 0℃ 冰线
+      const iceEta = iceLineEta();
+      if (iceEta) {
+        const xi = 2 * iceEta * Math.sqrt(alpha * tSec);
+        if (xi < DMAX) {
+          pctx.strokeStyle = "#8fe0ff";
+          pctx.beginPath(); pctx.moveTo(0, yOf(xi)); pctx.lineTo(W, yOf(xi)); pctx.stroke();
+          pctx.fillStyle = "#bfeaff";
+          pctx.fillText(`0℃ 冰线 ${fmt(xi, 2)}m`, 10, yOf(xi) + 14);
+        }
+      }
+      // 探针
+      const ypx = yOf(state.probe);
+      pctx.fillStyle = "#fff";
+      pctx.beginPath(); pctx.arc(W - 20, ypx, 4, 0, 7); pctx.fill();
+      pctx.strokeStyle = "rgba(255,255,255,0.5)";
+      pctx.beginPath(); pctx.moveTo(W - 60, ypx); pctx.lineTo(W - 24, ypx); pctx.stroke();
+      pctx.fillStyle = "rgba(230,240,255,0.85)";
+      pctx.fillText("探针", W - 58, ypx - 6);
+      pctx.fillText("深处仍 " + state.Ti + "℃ →", 10, H - 14);
+    }
+
+    function iceLineEta() {
+      if (state.Ts >= 0 || state.Ti <= 0) return null;
+      const target = (0 - state.Ts) / (state.Ti - state.Ts);
+      return solveBisect((e) => erf(e) - target, 0, 3);
+    }
+
+    // ---------------- 深度-时间热力图 ----------------
+    const map = $("#mapCanvas"), mctx = map.getContext("2d");
+    const off = document.createElement("canvas");
+    off.width = map.width; off.height = map.height;
+
+    function buildMap() {
+      const { alpha } = soil();
+      const W = off.width, H = off.height;
+      const octx = off.getContext("2d");
+      const img = octx.createImageData(W, H);
+      const PAD_L = 46, PAD_B = 26;
+      for (let px = 0; px < W; px++) {
+        const day = Math.max(0.05, ((px - PAD_L) / (W - PAD_L)) * TMAXD);
+        const tSec = day * 86400;
+        for (let py = 0; py < H; py++) {
+          const idx = (py * W + px) * 4;
+          if (px < PAD_L || py > H - PAD_B) {   // 轴区
+            img.data[idx + 3] = 0;
+            continue;
+          }
+          const x = (py / (H - PAD_B)) * DMAX;
+          const c = tempColor(Txt(x, tSec, alpha), state.Ts, state.Ti + 4);
+          const m = c.match(/\d+/g);
+          img.data[idx] = +m[0]; img.data[idx + 1] = +m[1]; img.data[idx + 2] = +m[2];
+          img.data[idx + 3] = 255;
+        }
+      }
+      octx.putImageData(img, 0, 0);
+      // 等温线 (0℃ 与 -10℃): x = 2η√(αt)
+      const iso = [{ T: 0, c: "#bfeaff" }, { T: -10, c: "#7fb8e8" }];
+      iso.forEach(({ T, c }) => {
+        if (T <= state.Ts || T >= state.Ti) return;
+        const eta = solveBisect((e) => erf(e) - (T - state.Ts) / (state.Ti - state.Ts), 0, 3);
+        octx.strokeStyle = c;
+        octx.setLineDash([5, 4]);
+        octx.beginPath();
+        let started = false;
+        for (let px = PAD_L; px < W; px += 3) {
+          const day = Math.max(0.05, ((px - PAD_L) / (W - PAD_L)) * TMAXD);
+          const x = 2 * eta * Math.sqrt(alpha * day * 86400);
+          if (x > DMAX) continue;
+          const py = (x / DMAX) * (H - PAD_B);
+          started ? octx.lineTo(px, py) : octx.moveTo(px, py);
+          started = true;
+        }
+        octx.stroke();
+        octx.setLineDash([]);
+        octx.fillStyle = c;
+        octx.font = "11px Consolas";
+        const day = TMAXD * 0.75;
+        const x = 2 * eta * Math.sqrt(alpha * day * 86400);
+        if (x < DMAX) octx.fillText(`${T}℃ 等温线`, PAD_L + 0.75 * (W - PAD_L) - 30, (x / DMAX) * (H - PAD_B) - 5);
+      });
+      // 轴标注
+      octx.fillStyle = "rgba(200,222,245,0.8)";
+      octx.font = "11px Consolas";
+      [0, 30, 60, 90].forEach((d) => {
+        const px = PAD_L + (d / TMAXD) * (W - PAD_L);
+        octx.fillText(`${d}天`, Math.min(px, W - 34), H - 8);
+      });
+      for (let d = 0; d <= DMAX; d += 2) {
+        octx.fillText(`${d}m`, 14, Math.max(12, (d / DMAX) * (H - PAD_B) + 4));
+      }
+    }
+
+    function drawMap() {
+      const W = map.width, H = map.height, PAD_L = 46, PAD_B = 26;
+      mctx.clearRect(0, 0, W, H);
+      mctx.drawImage(off, 0, 0);
+      // 当前时间游标
+      const px = PAD_L + (state.day / TMAXD) * (W - PAD_L);
+      mctx.strokeStyle = "#ffcf9e";
+      mctx.lineWidth = 2;
+      mctx.beginPath(); mctx.moveTo(px, 0); mctx.lineTo(px, H - PAD_B); mctx.stroke();
+      mctx.lineWidth = 1;
+      mctx.fillStyle = "#ffcf9e";
+      mctx.font = "12px Consolas";
+      mctx.fillText(`第 ${fmt(state.day, 1)} 天`, clamp(px + 6, PAD_L, W - 80), 16);
+    }
+
+    map.addEventListener("pointerdown", (e) => pickTime(e, true));
+    map.addEventListener("pointermove", (e) => { if (e.buttons) pickTime(e, true); });
+    function pickTime(e) {
+      const rect = map.getBoundingClientRect();
+      const px = ((e.clientX - rect.left) / rect.width) * map.width;
+      const PAD_L = 46;
+      state.day = clamp(((px - PAD_L) / (map.width - PAD_L)) * TMAXD, 0.1, TMAXD);
+      $("#day").value = state.day;
+      $("#dayOut").textContent = `第 ${fmt(state.day, 1)} 天`;
+      update(false);
+    }
+
+    // ---------------- erf 曲线 ----------------
+    const esvg = $("#erfSvg");
+    function drawErf() {
+      esvg.innerHTML = "";
+      const { alpha } = soil();
+      const X = scale([0, 2.5], [64, 690]);
+      const Y = scale([0, 1], [230, 30]);
+      svgEl("line", { x1: 64, y1: 230, x2: 690, y2: 230, stroke: "#39516d" }, esvg);
+      svgEl("line", { x1: 64, y1: 230, x2: 64, y2: 24, stroke: "#39516d" }, esvg);
+      [0.5, 1, 1.5, 2, 2.5].forEach((v) => svgEl("text", { x: X(v), y: 248, "text-anchor": "middle", class: "svg-note", text: v }, esvg));
+      [0.5, 1].forEach((v) => svgEl("text", { x: 44, y: Y(v) + 4, class: "svg-note", text: v }, esvg));
+      svgEl("text", { x: 660, y: 262, class: "svg-note", text: "η = x/2√(αt)" }, esvg);
+      svgEl("text", { x: 70, y: 20, class: "svg-note", text: "erf(η) 无量纲温度恢复率" }, esvg);
+      let d = "";
+      for (let e = 0; e <= 2.5; e += 0.03) d += (d ? "L" : "M") + X(e) + "," + Y(erf(e));
+      svgEl("path", { d, fill: "none", stroke: "#53c1ff", "stroke-width": 2.5 }, esvg);
+      // η=2 (渗透深度定义) 参考线
+      svgEl("line", { x1: X(2), y1: 230, x2: X(2), y2: Y(erf(2)), stroke: "rgba(255,179,107,0.4)", "stroke-dasharray": "4 4" }, esvg);
+      svgEl("text", { x: X(2), y: Y(erf(2)) - 8, "text-anchor": "middle", class: "svg-note", fill: "#ffcf9e", text: "η=2 → 99.5% 恢复 = 渗透锋面" }, esvg);
+      // 工作点
+      const tSec = state.day * 86400;
+      const eta = clamp(state.probe / (2 * Math.sqrt(alpha * tSec)), 0, 2.5);
+      svgEl("circle", { cx: X(eta), cy: Y(erf(eta)), r: 6, fill: "#ffe6cd", stroke: "#e0561f", "stroke-width": 2 }, esvg);
+      svgEl("text", { x: X(eta) + 10, y: Y(erf(eta)) + 14, class: "svg-note", fill: "#ffd9b8",
+        text: `工作点 η=${fmt(eta, 3)} → erf=${fmt(erf(eta), 3)}` }, esvg);
+    }
+
+    // ---------------- 读数 ----------------
+    function renderMetrics() {
+      const { alpha, lambda } = soil();
+      const tSec = state.day * 86400;
+      const dp = 4 * Math.sqrt(alpha * tSec);
+      const Tp = Txt(state.probe, tSec, alpha);
+      const qs = lambda * (state.Ti - state.Ts) / Math.sqrt(Math.PI * alpha * tSec);
+      $("#vDp").innerHTML = `${fmt(dp, 2)}<small>m</small>`;
+      $("#vProbe").innerHTML = `${fmt(Tp, 1)}<small>℃ @ ${fmt(state.probe, 1)}m</small>`;
+      $("#vQs").innerHTML = `${fmt(qs, 1)}<small>W/m²</small>`;
+      const eta = iceLineEta();
+      const xi = eta ? 2 * eta * Math.sqrt(alpha * tSec) : null;
+      $("#vIce").innerHTML = xi ? `${fmt(xi, 2)}<small>m</small>` : `--<small>无冻结</small>`;
+    }
+
+    function update(rebuild = true) {
+      if (rebuild) buildMap();
+      drawProfile();
+      drawMap();
+      drawErf();
+      renderMetrics();
+    }
+
+    bindSlider("#day", "#dayOut", (v) => `第 ${fmt(v, 1)} 天`, (v) => { state.day = v; update(false); });
+    bindSlider("#wet", "#wetOut", (v) => v < 0.33 ? "干土" : v < 0.66 ? "中湿" : "湿土", (v) => { state.wet = v; update(); });
+    bindSlider("#ts", "#tsOut", (v) => `${v} ℃`, (v) => { state.Ts = v; update(); });
+    bindSlider("#ti", "#tiOut", (v) => `${v} ℃`, (v) => { state.Ti = v; update(); });
+    bindSlider("#probe", "#probeOut", (v) => `${fmt(v, 1)} m`, (v) => { state.probe = v; update(false); });
+
+    $("#playBtn").addEventListener("click", () => {
+      state.playing = !state.playing;
+      $("#playBtn").textContent = state.playing ? "⏸ 暂停" : "▶ 播放";
+    });
+
+    let last = performance.now();
+    function loop(now) {
+      const dt = (now - last) / 1000;
+      last = now;
+      if (state.playing) {
+        state.day = state.day + dt * 8;
+        if (state.day > 90) state.day = 0.1;
+        $("#day").value = state.day;
+        $("#dayOut").textContent = `第 ${fmt(state.day, 1)} 天`;
+        update(false);
+      }
+      requestAnimationFrame(loop);
+    }
+    update();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
