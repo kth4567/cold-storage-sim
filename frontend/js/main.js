@@ -104,6 +104,7 @@ const KP_CLOUDS = [
   { pos: [0, 4.72, -3.1],     ids: ["KP05", "KP07"], label: "蒸发器·结霜" },
   { pos: [0, 4.72, -11.35],   ids: ["KP06"], label: "风机对流" },
   { pos: [1.15, 5.3, -7.5],   ids: ["KP11"], label: "管道保温" },
+  { pos: [12.2, 4.5, 1.0],    ids: ["KP05"], label: "冷凝器换热" },
   { pos: [-3.9, 3.75, -8.75], ids: CARGO_KP, label: "货物降温" },
   { pos: [3.9, 3.75, -5.5],   ids: CARGO_KP, label: "货物降温" },
 ];
@@ -225,8 +226,10 @@ function cyl(radius, height, material, position, rotation = new THREE.Euler(), s
   return mesh;
 }
 
-function addCollider(minX, maxX, minZ, maxZ) {
-  colliders.push({ minX, maxX, minZ, maxZ });
+function addCollider(minX, maxX, minZ, maxZ, minY, maxY) {
+  // minY/maxY: 碰撞生效的视点高度带 (可选)。墙体设 maxY 后, 站上屋面即不再受阻;
+  // 屋面护栏设 minY 后, 只对屋面上的玩家生效, 不影响地面通行。
+  colliders.push({ minX, maxX, minZ, maxZ, minY, maxY });
 }
 
 // ---------------------------------------------------------------- 静态场景
@@ -440,17 +443,14 @@ function addRefrigerantPiping() {
   plate.position.set(6.93, 5.6, 3.81);
   scene.add(plate);
 
-  // 库外段: 沿外墙落至压缩机组接管高度
-  seg(suctionMat, SR, [7.0, 5.62, 3.9], [7.3, 5.62, 3.9]);
-  seg(suctionMat, SR, [7.3, 5.62, 3.9], [7.3, 1.3, 3.9]);
-  seg(suctionMat, SR, [7.3, 1.3, 3.9], [9.5, 1.3, 3.9]);
-  joint(suctionMat, SR, [7.3, 5.62, 3.9]);
-  joint(suctionMat, SR, [7.3, 1.3, 3.9]);
-  seg(liquidMat, LR, [7.0, 5.56, 3.72], [7.3, 5.56, 3.72]);
-  seg(liquidMat, LR, [7.3, 5.56, 3.72], [7.3, 1.15, 3.72]);
-  seg(liquidMat, LR, [7.3, 1.15, 3.72], [9.5, 1.15, 3.72]);
-  joint(liquidMat, LR, [7.3, 5.56, 3.72]);
-  joint(liquidMat, LR, [7.3, 1.15, 3.72]);
+  // 库外段: 高位跨越两建筑间隙 (1.1m), 直接穿入制冷机房西墙 (室内延续段在 addEquipment)
+  seg(suctionMat, SR, [7.0, 5.62, 3.9], [8.31, 5.62, 3.9]);
+  seg(liquidMat, LR, [7.0, 5.56, 3.72], [8.31, 5.56, 3.72]);
+  // 机房西墙穿墙封板
+  const mrPlate = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.55, 0.55),
+    new THREE.MeshStandardMaterial({ color: 0x5c6873, roughness: 0.4, metalness: 0.6 }));
+  mrPlate.position.set(8.18, 5.6, 3.81);
+  scene.add(mrPlate);
 
   // 化霜排水管 (PVC): 后墙机组坡向后墙落地; 中段机组坡向东墙落地
   const DR = 0.032;
@@ -705,34 +705,535 @@ function addAirCurtain() {
   airCurtainSys = { points, positions, vel, count };
 }
 
+// 制冷机房 —— 按真实冷库工程图纸: 机组置于独立机房内, 蒸发式冷凝器在机房屋顶
+// (对应图纸"机房屋顶制冷工艺管道布置平面图"), 贮液器在室内、屋顶冷凝器下方(热虹吸落差)。
+// 设备按真实尺寸: VHU-3640 撬长约 7m; VRC-0456A "1218"=12x18 英尺 (5.5x3.7m), 高约 4m。
+//   高压级机组 VHU-3640 (2xHSK8581-160 + 1xHSK95103-320, 带油分/经济器, -6/35℃ 1682kW)
+//   低压级机组 VBU330   (3xHSKB8591-110, 带油分, -26/-6℃ 879kW)
+//   蒸发式冷凝器 VRC-0456A-1218N-JA (1303.6kW/台, 顶置轴流风机, 带护栏与喷淋水泵)
+//   立式热虹吸贮液器 4.5m3 + ELBSM3/ELBSL3 机组控制柜(沿东墙)
+// 机房外壳: x 8.2~19.0, z -4.6~5.0, 高 6m; 卷帘门在北墙 x 15.6~18.6。
 function addEquipment() {
-  box(7, 0.35, 2.6, mats.darkSteel, new THREE.Vector3(11.8, 0.28, 4.4));
-  box(1.35, 1.8, 1.1, new THREE.MeshStandardMaterial({ color: 0xd6d0bc, roughness: 0.58, metalness: 0.25 }), new THREE.Vector3(13.5, 1.34, 4.0));
-  for (let i = 0; i < 3; i++) {
-    cyl(0.45, 1.65, mats.compressor, new THREE.Vector3(9.5 + i * 1.45, 1.22, 4.35));
-    cyl(0.18, 1.35, mats.darkSteel, new THREE.Vector3(9.5 + i * 1.45, 1.2, 3.35), new THREE.Euler(Math.PI / 2, 0, 0));
-  }
-  box(4.7, 1.9, 2.3, mats.steel, new THREE.Vector3(12.6, 3.2, -2.3));
-  // 冷凝器支腿 (箱体底面 y=2.25)
-  [[10.5, -3.2], [10.5, -1.4], [14.7, -3.2], [14.7, -1.4]].forEach(([x, z]) => {
-    box(0.14, 2.3, 0.14, mats.darkSteel, new THREE.Vector3(x, 1.15, z));
-  });
-  const finMat = new THREE.MeshStandardMaterial({ color: 0x1a242e, roughness: 0.56, metalness: 0.4 });
-  for (let i = 0; i < 7; i++) {
-    box(0.06, 1.7, 2.35, finMat, new THREE.Vector3(10.45 + i * 0.7, 3.2, -2.3), false, true);
-  }
-  [[11.55, -2.95], [13.65, -1.65]].forEach(([x, z]) => {
-    const topFan = new THREE.Group();
-    topFan.position.set(x, 4.25, z);
-    scene.add(topFan);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.04, 12, 48), mats.darkSteel);
-    ring.rotation.x = Math.PI / 2;
-    topFan.add(ring);
-    fans.push(topFan);
+  const galv = new THREE.MeshStandardMaterial({ color: 0xa7b2ba, roughness: 0.46, metalness: 0.72 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xc9ced3, roughness: 0.85, metalness: 0.08 });
+  const cabinetMat = new THREE.MeshStandardMaterial({ color: 0xd6d0bc, roughness: 0.58, metalness: 0.25 });
+  const louverMat = new THREE.MeshStandardMaterial({ color: 0x39434d, roughness: 0.5, metalness: 0.55 });
+  const plinthMat = new THREE.MeshStandardMaterial({ color: 0x6d747b, roughness: 0.92, metalness: 0.02 });
+  const dischargeMat = new THREE.MeshStandardMaterial({ color: 0x8e4d2a, roughness: 0.42, metalness: 0.6 });
+  const suctionMat = new THREE.MeshStandardMaterial({ color: 0xd9dee3, roughness: 0.82, metalness: 0.05 });
+  const liquidMat = new THREE.MeshStandardMaterial({ color: 0xa96f33, roughness: 0.35, metalness: 0.8 });
+  const screenMat = new THREE.MeshStandardMaterial({ color: 0x0a1a10, emissive: 0x2fd06a, emissiveIntensity: 0.75, roughness: 0.3 });
+  const railMat = new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.5, metalness: 0.4 });
+
+  const plate = (lines, w, h, pos, rotY = 0, opt = {}) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshStandardMaterial({ map: TEX.signTexture(lines, { w: 1024, h: 256, ...opt }), roughness: 0.5, metalness: 0.1 }));
+    m.position.copy(pos);
+    m.rotation.y = rotY;
+    scene.add(m);
+  };
+  const pipe = (mat, r, a, b) => {
+    const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, d.length(), 14), mat);
+    m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+    if (Math.abs(d.x) > 0.01) m.rotation.z = Math.PI / 2;
+    else if (Math.abs(d.z) > 0.01) m.rotation.x = Math.PI / 2;
+    m.castShadow = true;
+    scene.add(m);
+    return m;
+  };
+  const elbow = (mat, r, p) => {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(r * 1.3, 12, 10), mat);
+    s.position.set(p[0], p[1], p[2]);
+    scene.add(s);
+  };
+
+  // ============ 机房建筑 (10.8 x 9.6 x 6m, 平屋面) ============
+  box(0.2, 6, 9.6, wallMat, new THREE.Vector3(8.3, 3, 0.2));                 // 西墙
+  box(0.2, 6, 9.6, wallMat, new THREE.Vector3(18.9, 3, 0.2));                // 东墙
+  box(10.8, 6, 0.2, wallMat, new THREE.Vector3(13.6, 3, -4.5));              // 南墙
+  box(7.4, 6, 0.2, wallMat, new THREE.Vector3(11.9, 3, 4.9));                // 北墙西段
+  box(0.4, 6, 0.2, wallMat, new THREE.Vector3(18.8, 3, 4.9));                // 北墙东段
+  box(3.0, 2.2, 0.2, wallMat, new THREE.Vector3(17.1, 4.9, 4.9));            // 门楣
+  box(11.0, 0.18, 9.8, wallMat, new THREE.Vector3(13.6, 6.09, 0.2));         // 屋面板(挑檐)
+  // 卷帘门(卷起状态): 卷筒 + 两侧导轨
+  const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 3.1, 18), galv);
+  roll.rotation.z = Math.PI / 2;
+  roll.position.set(17.1, 4.0, 4.72);
+  scene.add(roll);
+  [15.62, 18.58].forEach((gx) => box(0.1, 3.9, 0.12, mats.darkSteel, new THREE.Vector3(gx, 1.95, 4.82)));
+  // 门口标识 + 通风百叶 (南墙 2 组, 东墙 1 组)
+  plate(["制 冷 机 房"], 2.2, 0.44, new THREE.Vector3(17.1, 4.42, 5.115), 0, { bg: "#123f7d" });
+  plate(["机房重地", "闲人免进"], 0.66, 0.5, new THREE.Vector3(15.0, 2.2, 5.115), 0, { bg: "#8a1414" });
+  const louverPanel = (px, py, pz, rotY) => {
+    const g = new THREE.Group();
+    g.position.set(px, py, pz);
+    g.rotation.y = rotY;
+    scene.add(g);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 0.06), louverMat);
+    g.add(frame);
+    for (let i = 0; i < 6; i++) {
+      const slat = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.03), mats.darkSteel);
+      slat.position.set(0, -0.48 + i * 0.19, 0.045);
+      slat.rotation.x = 0.6;
+      g.add(slat);
+    }
+  };
+  louverPanel(10.8, 4.4, -4.62, Math.PI);
+  louverPanel(16.4, 4.4, -4.62, Math.PI);
+  louverPanel(19.02, 4.4, -1.8, Math.PI / 2);
+  // 室内照明: 吸顶灯带 x2 + 点光源
+  [[10.5, 1.5], [15.5, -1.5]].forEach(([lx, lz]) => {
+    const fix = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.07, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0xf2f5f7, emissive: 0xfff3dc, emissiveIntensity: 1.4, roughness: 0.4 }));
+    fix.position.set(lx, 5.72, lz);
+    scene.add(fix);
+    const pl = new THREE.PointLight(0xfff1dd, 14, 18, 1.6);
+    pl.position.set(lx, 5.3, lz);
+    scene.add(pl);
   });
 
-  addCollider(8.3, 15.2, 3.0, 5.8);
-  addCollider(10.25, 14.95, -3.45, -1.15);
+  // ============ 螺杆压缩机组撬块 (真实尺寸, 撬体沿 z 向, 机头横置排布) ============
+  // 单台比泽尔 HSK 式半封闭螺杆机: 阶梯变径铸壳 —— 西端盖/电机段(纵向散热筋)/
+  // 中间法兰/压缩段/排气轴承座/东端盖, 加电机接线盒、吸排气截止阀(红手轮)、
+  // 油视镜、油加热器、底脚。轴向沿 x (横跨撬宽)。
+  const brassMat = new THREE.MeshStandardMaterial({ color: 0xb08d3e, roughness: 0.35, metalness: 0.8 });
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0xb03028, roughness: 0.5, metalness: 0.4 });
+  const gaugeMat = new THREE.MeshStandardMaterial({ color: 0xf4f6f8, emissive: 0xdfe6ea, emissiveIntensity: 0.18, roughness: 0.4 });
+  const shutValve = (g, px, py, pz, s, mat) => {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.2 * s, 0.16 * s, 0.17 * s), mat);
+    body.position.set(px, py, pz);
+    g.add(body);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14 * s, 8), mats.darkSteel);
+    stem.position.set(px, py + 0.13 * s, pz);
+    g.add(stem);
+    const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.09 * s, 0.016, 8, 22), wheelMat);
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(px, py + 0.2 * s, pz);
+    g.add(wheel);
+  };
+  const screwCompressor = (g, cz, r, len) => {
+    const H = r + 0.2;
+    const seg = (cx, rad, w, mat) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, w, 26), mat);
+      m.rotation.z = Math.PI / 2;
+      m.position.set(cx, H, cz);
+      m.castShadow = true;
+      g.add(m);
+      return m;
+    };
+    const mLen = len * 0.4, cLen = len * 0.34, dLen = len * 0.16;
+    const x0 = -len / 2;
+    seg(x0 - 0.04, r * 0.62, 0.09, mats.darkSteel);                    // 西端盖
+    seg(x0 + mLen / 2, r, mLen, mats.compressor);                      // 电机段
+    for (let i = 0; i < 10; i++) {                                     // 纵向散热筋
+      const a = (i / 10) * Math.PI * 2;
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(mLen * 0.88, 0.035, 0.035), mats.compressor);
+      rib.position.set(x0 + mLen / 2, H + Math.cos(a) * r, cz + Math.sin(a) * r);
+      rib.rotation.x = a;
+      g.add(rib);
+    }
+    seg(x0 + mLen + 0.035, r * 1.08, 0.09, mats.compressor);           // 中间法兰
+    seg(x0 + mLen + 0.07 + cLen / 2, r * 0.88, cLen, mats.compressor); // 压缩段
+    seg(len / 2 - dLen - 0.03, r * 0.93, 0.07, mats.compressor);       // 台阶环
+    seg(len / 2 - dLen / 2, r * 0.66, dLen, mats.compressor);          // 排气轴承座
+    seg(len / 2 + 0.03, r * 0.4, 0.08, mats.darkSteel);                // 东端盖
+    // 电机接线盒 + 出线短管
+    const jbox = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.3), mats.darkSteel);
+    jbox.position.set(x0 + mLen / 2, H + r + 0.1, cz);
+    jbox.castShadow = true;
+    g.add(jbox);
+    // 吸气截止阀 (西端顶) / 排气截止阀 (排气座顶)
+    const sucStub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.28, r * 0.28, 0.3, 14), suctionMat);
+    sucStub.position.set(x0 + 0.28, H + r * 0.8 + 0.1, cz);
+    g.add(sucStub);
+    shutValve(g, x0 + 0.28, H + r * 0.8 + 0.34, cz, 1.15, mats.steel);
+    const disStub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.2, r * 0.2, 0.3, 12), dischargeMat);
+    disStub.position.set(len / 2 - 0.22, H + r * 0.66 + 0.08, cz);
+    g.add(disStub);
+    shutValve(g, len / 2 - 0.22, H + r * 0.66 + 0.3, cz, 0.9, dischargeMat);
+    // 油视镜 x2 (压缩段侧面) + 油加热器
+    [0, 0.24].forEach((off) => {
+      const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.03, 12), brassMat);
+      glass.rotation.x = Math.PI / 2;
+      glass.position.set(x0 + mLen + 0.1 + cLen / 2 + off, H - r * 0.35, cz + r * 0.82);
+      g.add(glass);
+    });
+    const heater = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.16, 8), brassMat);
+    heater.rotation.z = Math.PI / 2;
+    heater.position.set(x0 + mLen + 0.1 + cLen / 2 - 0.3, H - r * 0.8, cz);
+    g.add(heater);
+    // 底脚
+    [x0 + 0.25, len / 2 - 0.3].forEach((fx) => {
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.2, 0.4), mats.darkSteel);
+      foot.position.set(fx, 0.1, cz);
+      foot.castShadow = true;
+      g.add(foot);
+    });
+  };
+
+  // 撬块: 混凝土惰性基础 + 钢底架 + n 台横置螺杆机 + 立式油分(南端) + 集管 +
+  // 油贮存器/电磁阀组/仪表盘/撬上桥架 (+ 高压级: 经济器与热虹吸油冷) + 铭牌
+  const skidUnit = (sx, sz, baseW, baseL, comps, oil, plateLines, econ) => {
+    const g = new THREE.Group();
+    g.position.set(sx, 0, sz);
+    scene.add(g);
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(baseW + 0.3, 0.25, baseL + 0.3), plinthMat);
+    plinth.position.y = 0.125;
+    plinth.receiveShadow = true;
+    g.add(plinth);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(baseW, 0.18, baseL), mats.darkSteel);
+    base.position.y = 0.34;
+    g.add(base);
+    const inner = new THREE.Group();                       // 设备层 (基础顶面)
+    inner.position.y = 0.43;
+    g.add(inner);
+    comps.forEach((c) => screwCompressor(inner, c.dz, c.r, c.len));
+    // 立式油分离器 (撬南端)
+    const oilSep = new THREE.Mesh(new THREE.CylinderGeometry(oil.r, oil.r, oil.h, 26), galv);
+    oilSep.position.set(oil.dx, oil.h / 2, oil.dz);
+    oilSep.castShadow = true;
+    inner.add(oilSep);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(oil.r, 26, 12, 0, Math.PI * 2, 0, Math.PI / 2), galv);
+    dome.position.set(oil.dx, oil.h, oil.dz);
+    inner.add(dome);
+    // 吸气集管 (撬西侧通长, y1.58) -> 各机吸气截止阀
+    const hy = 0.43 + 1.15;
+    const sucX = sx - baseW / 2 - 0.3, disX = sx + baseW / 2 + 0.3;
+    pipe(suctionMat, 0.1, [sucX, hy, sz + baseL / 2], [sucX, hy, sz + comps[0].dz - 0.4]);
+    comps.forEach((c) => {
+      const bx = sx - c.len / 2 + 0.28;
+      const stubY = 0.43 + c.r + 0.2 + c.r * 0.8 + 0.1;
+      pipe(suctionMat, 0.06, [sucX, hy, sz + c.dz], [bx, hy, sz + c.dz]);
+      pipe(suctionMat, 0.06, [bx, hy, sz + c.dz], [bx, stubY, sz + c.dz]);
+    });
+    // 排气集管 (撬东侧, y2.2 高位越过排气阀) -> 立式油分上部
+    const DHY = 2.2;
+    pipe(dischargeMat, 0.07, [disX, DHY, sz + comps[comps.length - 1].dz + 0.4], [disX, DHY, sz + oil.dz]);
+    comps.forEach((c) => {
+      const bx = sx + c.len / 2 - 0.22;
+      const vTop = 0.43 + c.r + 0.2 + c.r * 0.66 + 0.5;
+      pipe(dischargeMat, 0.05, [bx, vTop, sz + c.dz], [bx, DHY, sz + c.dz]);
+      pipe(dischargeMat, 0.05, [bx, DHY, sz + c.dz], [disX, DHY, sz + c.dz]);
+    });
+    pipe(dischargeMat, 0.07, [disX, DHY, sz + oil.dz], [sx + oil.dx + oil.r, DHY, sz + oil.dz]);
+    elbow(dischargeMat, 0.07, [disX, DHY, sz + oil.dz]);
+    // 油路: 卧式油贮存器(带油视镜) + 与油分连通短管
+    const oilRes = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.85, 18), galv);
+    oilRes.rotation.x = Math.PI / 2;
+    oilRes.position.set(oil.dx - 0.02, 0.42, oil.dz + 0.98);
+    oilRes.castShadow = true;
+    inner.add(oilRes);
+    [-0.16, 0.14].forEach((off) => {
+      const sg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 10), brassMat);
+      sg.rotation.z = Math.PI / 2;
+      sg.position.set(oil.dx - 0.23, 0.42, oil.dz + 0.98 + off);
+      inner.add(sg);
+    });
+    pipe(brassMat, 0.022, [sx + oil.dx - 0.02, 0.85, sz + oil.dz + 0.56],
+      [sx + oil.dx - 0.02, 0.85, sz + oil.dz + oil.r - 0.05]);
+    // 电磁阀组 (油路/能调, 图纸电气表同款配置): 母管 + 4 只带线圈阀体
+    const mfz = baseL / 2 - 0.35;
+    const manifold = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 1.0, 10), mats.steel);
+    manifold.rotation.z = Math.PI / 2;
+    manifold.position.set(-0.15, 0.55, mfz);
+    inner.add(manifold);
+    for (let i = 0; i < 4; i++) {
+      const vb = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.13, 0.1), mats.darkSteel);
+      vb.position.set(-0.51 + i * 0.24, 0.6, mfz);
+      inner.add(vb);
+      const coil = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.07, 10), mats.darkSteel);
+      coil.position.set(-0.51 + i * 0.24, 0.7, mfz);
+      inner.add(coil);
+      const nut = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.03, 8), brassMat);
+      nut.position.set(-0.51 + i * 0.24, 0.75, mfz);
+      inner.add(nut);
+    }
+    // 仪表盘 (撬北端, 面向大门): 吸排气压力表 + 油压表
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.42, 0.04), cabinetMat);
+    panel.position.set(0.62, 1.42, baseL / 2 + 0.26);
+    inner.add(panel);
+    [-0.2, 0, 0.2].forEach((gx) => {
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.02, 16), mats.darkSteel);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.set(0.62 + gx, 1.46, baseL / 2 + 0.285);
+      inner.add(rim);
+      const face = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.068, 0.024, 16), gaugeMat);
+      face.rotation.x = Math.PI / 2;
+      face.position.set(0.62 + gx, 1.46, baseL / 2 + 0.287);
+      inner.add(face);
+    });
+    [0.4, 0.84].forEach((px) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.2, 8), mats.darkSteel);
+      post.position.set(px, 0.62, baseL / 2 + 0.26);
+      inner.add(post);
+    });
+    // 撬上电缆桥架 (电机接线盒上方通长) + 每机下垂线管
+    const trayY = 2.35, trayX = -0.5;
+    const tray = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.035, baseL - 1.2), mats.darkSteel);
+    tray.position.set(trayX, trayY, 0.3);
+    inner.add(tray);
+    comps.forEach((c) => {
+      const topY = 2 * c.r + 0.52;                       // 接线盒顶
+      const drop = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, trayY - topY, 8), galv);
+      drop.position.set(trayX, (trayY + topY) / 2, c.dz);
+      inner.add(drop);
+    });
+    // 经济器 + 热虹吸油冷却器 (高压级)
+    if (econ) {
+      const eco = new THREE.Mesh(new THREE.BoxGeometry(0.45, 1.1, 0.62), galv);
+      eco.position.set(-baseW / 2 + 0.35, 0.98, oil.dz + 1.15);
+      eco.castShadow = true;
+      inner.add(eco);
+      for (let i = 0; i < 6; i++) {
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.025, 0.64), mats.darkSteel);
+        rib.position.set(-baseW / 2 + 0.35, 0.52 + i * 0.18, oil.dz + 1.15);
+        inner.add(rib);
+      }
+      const cooler = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 1.1, 18), galv);
+      cooler.rotation.x = Math.PI / 2;
+      cooler.position.set(oil.dx + 0.55, 1.3, oil.dz + 1.0);
+      cooler.castShadow = true;
+      inner.add(cooler);
+      [[0.35, 0.06], [-0.35, 0.06]].forEach(([oz, rr]) => {
+        const stub = new THREE.Mesh(new THREE.CylinderGeometry(rr, rr, 0.2, 10), liquidMat);
+        stub.position.set(oil.dx + 0.55, 1.48, oil.dz + 1.0 + oz);
+        inner.add(stub);
+      });
+    }
+    // 机组铭牌 (双立柱, 朝东过道)
+    plate(plateLines, 2.1, 0.5, new THREE.Vector3(sx + 0.05, 3.35, sz + 0.6), Math.PI / 2, { bg: "#123f7d" });
+    [-1.0, 1.0].forEach((pz) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 2.7, 8), mats.darkSteel);
+      post.position.set(sx + 0.05, 1.75, sz + 0.6 + pz);
+      scene.add(post);
+    });
+  };
+
+  // 低压级 VBU330 (西列): 3x HSKB8591-110, 撬 2.0 x 6.2m
+  skidUnit(10.5, 0.0, 2.0, 6.2,
+    [{ dz: -1.05, r: 0.36, len: 2.0 }, { dz: 0.45, r: 0.36, len: 2.0 }, { dz: 1.95, r: 0.36, len: 2.0 }],
+    { dx: 0.15, dz: -2.5, r: 0.42, h: 2.3 },
+    ["低压级机组 VBU330  R507A", "3×HSKB8591-110   -26/-6℃   879kW"], false);
+  // 高压级 VHU-3640 (东列): 2x HSK8581-160 + 1x HSK95103-320(大机), 撬 2.4 x 7.0m
+  skidUnit(13.9, 0.0, 2.4, 7.0,
+    [{ dz: -1.35, r: 0.4, len: 2.3 }, { dz: 0.25, r: 0.4, len: 2.3 }, { dz: 2.0, r: 0.48, len: 2.7 }],
+    { dx: 0.55, dz: -2.85, r: 0.5, h: 2.6 },
+    ["高压级机组 VHU-3640  R507A", "2×HSK8581-160 + 1×HSK95103-320   -6/35℃   1682kW"], true);
+
+  // ============ 机组控制柜 (沿东墙: 图纸 ELBSM3/ELBSL3 + 机组控制箱) ============
+  [["ELBSM3-160/320S", 1.0], ["ELBSL3-110S", 2.2], ["机组控制箱", 3.4]].forEach(([label, cz]) => {
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.0, 1.05), cabinetMat);
+    cab.position.set(18.55, 1.0, cz);
+    cab.castShadow = true;
+    scene.add(cab);
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.22), screenMat);
+    scr.position.set(18.29, 1.5, cz);
+    scr.rotation.y = -Math.PI / 2;
+    scene.add(scr);
+    plate([label], 0.8, 0.18, new THREE.Vector3(18.28, 1.05, cz), -Math.PI / 2, { h: 128 });
+  });
+
+  // ============ 立式热虹吸贮液器 4.5m3 (室内东南角, 冷凝器正下方层) ============
+  const RX = 17.9, RZ = -2.6;
+  const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 2.6, 26), galv);
+  shell.position.set(RX, 1.8, RZ);
+  shell.castShadow = true;
+  scene.add(shell);
+  [[3.1, 0], [0.5, Math.PI]].forEach(([cy2, rx]) => {
+    const capm = new THREE.Mesh(new THREE.SphereGeometry(0.65, 26, 12, 0, Math.PI * 2, 0, Math.PI / 2), galv);
+    capm.position.set(RX, cy2, RZ);
+    capm.rotation.x = rx;
+    scene.add(capm);
+  });
+  [[0.45, 0.45], [-0.45, 0.45], [0.45, -0.45], [-0.45, -0.45]].forEach(([ox, oz]) => {
+    box(0.12, 0.5, 0.12, mats.darkSteel, new THREE.Vector3(RX + ox, 0.25, RZ + oz));
+  });
+  pipe(mats.steel, 0.022, [RX - 0.72, 0.9, RZ], [RX - 0.72, 3.0, RZ]);       // 液位计
+  plate(["热虹吸贮液器 4.5m³"], 1.0, 0.22, new THREE.Vector3(RX - 0.68, 1.9, RZ), -Math.PI / 2, { h: 96 });
+
+  // ============ 蒸发式冷凝器 VRC-0456A (机房屋顶, 5.5 x 3.7 x 4m + 护栏) ============
+  const CX = 13.6, CZ = 0.2, ROOF = 6.18;
+  // 型钢支架
+  [[-2.4, 0], [0, 0], [2.4, 0]].forEach(([bx]) => {
+    box(0.18, 0.72, 3.5, mats.darkSteel, new THREE.Vector3(CX + bx, ROOF + 0.36, CZ));
+  });
+  const CB = ROOF + 0.72;                                  // 冷凝器底面
+  box(5.5, 1.0, 3.7, louverMat, new THREE.Vector3(CX, CB + 0.5, CZ));        // 集水盘段
+  [CZ - 1.855, CZ + 1.855].forEach((fz) => {                                 // 进风百叶带
+    for (let i = 0; i < 6; i++) {
+      const slat = box(5.3, 0.1, 0.035, louverMat, new THREE.Vector3(CX, CB + 1.1 + i * 0.16, fz), false, false);
+      slat.rotation.x = fz > CZ ? 0.6 : -0.6;
+    }
+  });
+  box(5.5, 1.1, 3.7, galv, new THREE.Vector3(CX, CB + 1.55, CZ));            // 盘管段
+  box(5.5, 1.15, 3.7, mats.steel, new THREE.Vector3(CX, CB + 2.68, CZ));     // 上箱体
+  for (let i = 0; i < 5; i++) {                                              // 拼缝
+    box(0.035, 2.25, 3.74, mats.darkSteel, new THREE.Vector3(11.35 + i * 1.15, CB + 2.1, CZ), false, false);
+  }
+  box(5.5, 0.09, 3.7, galv, new THREE.Vector3(CX, CB + 3.3, CZ));            // 风机平台
+  // 2 台顶置轴流风机 (随压缩机启停)
+  [CX - 1.35, CX + 1.35].forEach((fx) => {
+    const shroud = new THREE.Mesh(new THREE.CylinderGeometry(0.92, 1.05, 0.72, 28), galv);
+    shroud.position.set(fx, CB + 3.72, CZ);
+    shroud.castShadow = true;
+    scene.add(shroud);
+    const grille = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.028, 8, 36), mats.darkSteel);
+    grille.rotation.x = Math.PI / 2;
+    grille.position.set(fx, CB + 4.12, CZ);
+    scene.add(grille);
+    const wrap = new THREE.Group();
+    wrap.position.set(fx, CB + 3.85, CZ);
+    wrap.rotation.x = -Math.PI / 2;
+    scene.add(wrap);
+    const rotor = new THREE.Group();
+    wrap.add(rotor);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.18, 16), mats.darkSteel);
+    hub.rotation.x = Math.PI / 2;
+    rotor.add(hub);
+    for (let i = 0; i < 6; i++) {
+      const th = (i / 6) * Math.PI * 2;
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.19, 0.035), mats.darkSteel);
+      blade.position.set(Math.cos(th) * 0.46, Math.sin(th) * 0.46, 0);
+      blade.rotation.z = th;
+      blade.rotateY(0.5);
+      rotor.add(blade);
+    }
+    rotor.userData = { speed: 9 };
+    fans.push(rotor);
+  });
+  // 冷凝器顶部护栏 (图纸: 带护栏)
+  const CT = CB + 3.35;
+  [[-2.75, 0, 3.7, "x"], [2.75, 0, 3.7, "x"], [0, -1.85, 5.5, "z"], [0, 1.85, 5.5, "z"]].forEach(([ox, oz, len, axis]) => {
+    [CT + 0.5, CT + 0.95].forEach((ry) => {
+      const r = new THREE.Mesh(new THREE.BoxGeometry(axis === "z" ? len : 0.045, 0.045, axis === "z" ? 0.045 : len), railMat);
+      r.position.set(axis === "x" ? CX + ox : CX, ry, axis === "x" ? CZ : CZ + oz);
+      scene.add(r);
+    });
+  });
+  [[-2.75, -1.85], [-2.75, 1.85], [2.75, -1.85], [2.75, 1.85], [0, -1.85], [0, 1.85], [-2.75, 0], [2.75, 0]].forEach(([ox, oz]) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 1.05, 8), railMat);
+    post.position.set(CX + ox, CT + 0.52, CZ + oz);
+    scene.add(post);
+  });
+  // 喷淋水泵 (屋面, 冷凝器东端) + 上水立管
+  const pump = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.55, 16), mats.compressor);
+  pump.rotation.z = Math.PI / 2;
+  pump.position.set(16.75, ROOF + 0.28, CZ + 1.2);
+  pump.castShadow = true;
+  scene.add(pump);
+  pipe(mats.steel, 0.055, [17.0, ROOF + 0.28, CZ + 1.2], [17.0, CB + 3.0, CZ + 1.2]);
+  elbow(mats.steel, 0.055, [17.0, CB + 3.0, CZ + 1.2]);
+  pipe(mats.steel, 0.055, [17.0, CB + 3.0, CZ + 1.2], [16.35, CB + 3.0, CZ + 1.2]);
+  // 冷凝器铭牌 (北面, 从院子可见)
+  plate(["蒸发式冷凝器 VRC-0456A-1218N-JA", "1303.6kW/台  风量16.9万m³/h  水泵209m³/h"],
+    2.4, 0.56, new THREE.Vector3(CX, CB + 2.4, CZ + 1.87), 0, { bg: "#155086" });
+
+  // ============ 屋面护栏 + 室外爬梯 (东墙) ============
+  const RY = [6.7, 7.15];
+  [[13.6, -4.95, 11.0, "z"], [13.6, 5.05, 11.0, "z"], [8.15, 0.05, 9.8, "x"], [19.05, 0.05, 9.8, "x"]].forEach(([px, pz, len, axis]) => {
+    RY.forEach((ry) => {
+      const r = new THREE.Mesh(new THREE.BoxGeometry(axis === "z" ? len : 0.045, 0.045, axis === "z" ? 0.045 : len), railMat);
+      r.position.set(px, ry, pz);
+      scene.add(r);
+    });
+  });
+  for (let i = 0; i < 5; i++) {
+    [[8.15 + i * 2.72, -4.95], [8.15 + i * 2.72, 5.05]].forEach(([px, pz]) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 1.1, 8), railMat);
+      post.position.set(px, 6.72, pz);
+      scene.add(post);
+    });
+  }
+  for (let i = 0; i < 4; i++) {
+    [[8.15, -4.95 + i * 3.33], [19.05, -4.95 + i * 3.33]].forEach(([px, pz]) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 1.1, 8), railMat);
+      post.position.set(px, 6.72, pz);
+      scene.add(post);
+    });
+  }
+  // 直爬梯 (东墙外, 带护笼, 上端伸出屋面便于跨越 —— 玩家可 W/S 攀爬)
+  for (let i = 0; i < 17; i++) {
+    const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.44, 8), mats.darkSteel);
+    rung.rotation.x = Math.PI / 2;
+    rung.position.set(19.16, 0.55 + i * 0.38, 1.4);
+    scene.add(rung);
+  }
+  [1.18, 1.62].forEach((lz) => {
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 7.2, 8), mats.darkSteel);
+    rail.position.set(19.16, 3.7, lz);
+    scene.add(rail);
+  });
+  plate(["检修爬梯 W上 · S下"], 0.8, 0.2, new THREE.Vector3(19.2, 2.25, 1.4), Math.PI / 2, { h: 96 });
+  for (let i = 0; i < 4; i++) {
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.018, 8, 20, Math.PI), mats.darkSteel);
+    hoop.position.set(19.2, 2.6 + i * 1.1, 1.4);
+    hoop.rotation.set(0, Math.PI / 2, Math.PI / 2);
+    scene.add(hoop);
+  }
+
+  // ============ 工艺管路 (室内接管 + 屋面跨接, 完整回路) ============
+  // 回气 DN100 (来自库房, 西墙穿入 y5.62): 沿西墙落地 -> 低压级吸气集管北端
+  pipe(suctionMat, 0.055, [8.4, 5.62, 3.9], [8.75, 5.62, 3.9]);
+  elbow(suctionMat, 0.055, [8.75, 5.62, 3.9]);
+  pipe(suctionMat, 0.055, [8.75, 5.62, 3.9], [8.75, 1.58, 3.9]);
+  elbow(suctionMat, 0.055, [8.75, 1.58, 3.9]);
+  pipe(suctionMat, 0.055, [8.75, 1.58, 3.9], [9.2, 1.58, 3.9]);
+  elbow(suctionMat, 0.1, [9.2, 1.58, 3.9]);
+  pipe(suctionMat, 0.1, [9.2, 1.58, 3.9], [9.2, 1.58, 2.8]);
+  // 中间级: 低压级油分顶 -> 高压级吸气集管 (双级压缩 -6℃ 中间管)
+  pipe(suctionMat, 0.08, [10.65, 3.05, -2.5], [10.65, 3.5, -2.5]);
+  elbow(suctionMat, 0.08, [10.65, 3.5, -2.5]);
+  pipe(suctionMat, 0.08, [10.65, 3.5, -2.5], [12.3, 3.5, -2.5]);
+  elbow(suctionMat, 0.08, [12.3, 3.5, -2.5]);
+  pipe(suctionMat, 0.08, [12.3, 3.5, -2.5], [12.3, 1.58, -2.5]);
+  elbow(suctionMat, 0.08, [12.3, 1.58, -2.5]);
+  pipe(suctionMat, 0.08, [12.3, 1.58, -2.5], [12.3, 1.58, 2.9]);
+  // 高压级排气 D108: 油分顶 -> 穿屋面 -> 冷凝器南面进气
+  const HSX = 13.9 + 0.55, HSZ = -2.85;                    // 高压级油分位置
+  pipe(dischargeMat, 0.055, [HSX, 3.15, HSZ], [HSX, 9.55, HSZ]);
+  cyl(0.1, 0.3, galv, new THREE.Vector3(HSX, ROOF + 0.1, HSZ));              // 屋面套管
+  elbow(dischargeMat, 0.055, [HSX, 9.55, HSZ]);
+  pipe(dischargeMat, 0.055, [HSX, 9.55, HSZ], [HSX, 9.55, -1.7]);
+  // 冷凝器出液 -> 落管穿屋面 -> 贮液器顶 (热虹吸重力回液)
+  pipe(liquidMat, 0.045, [12.5, CB + 0.35, CZ + 1.85], [12.5, CB + 0.35, CZ + 2.25]);
+  elbow(liquidMat, 0.045, [12.5, CB + 0.35, CZ + 2.25]);
+  pipe(liquidMat, 0.045, [12.5, CB + 0.35, CZ + 2.25], [12.5, 4.7, CZ + 2.25]);
+  cyl(0.09, 0.3, galv, new THREE.Vector3(12.5, ROOF + 0.1, CZ + 2.25));
+  elbow(liquidMat, 0.045, [12.5, 4.7, CZ + 2.25]);
+  pipe(liquidMat, 0.045, [12.5, 4.7, CZ + 2.25], [RX, 4.7, CZ + 2.25]);
+  elbow(liquidMat, 0.045, [RX, 4.7, CZ + 2.25]);
+  pipe(liquidMat, 0.045, [RX, 4.7, CZ + 2.25], [RX, 4.7, RZ]);
+  elbow(liquidMat, 0.045, [RX, 4.7, RZ]);
+  pipe(liquidMat, 0.045, [RX, 4.7, RZ], [RX, 3.6, RZ]);
+  // 供液 DN50: 贮液器底 -> 立管 -> 沿北墙高位 -> 西墙穿出接库房
+  pipe(liquidMat, 0.032, [RX, 0.4, RZ - 0.3], [RX, 0.4, RZ - 1.0]);
+  elbow(liquidMat, 0.032, [RX, 0.4, RZ - 1.0]);
+  pipe(liquidMat, 0.032, [RX, 0.4, RZ - 1.0], [RX, 5.56, RZ - 1.0]);
+  elbow(liquidMat, 0.032, [RX, 5.56, RZ - 1.0]);
+  pipe(liquidMat, 0.032, [RX, 5.56, RZ - 1.0], [RX, 5.56, 3.72]);
+  elbow(liquidMat, 0.032, [RX, 5.56, 3.72]);
+  pipe(liquidMat, 0.032, [RX, 5.56, 3.72], [8.4, 5.56, 3.72]);
+
+  // ============ 碰撞区 (玩家; 与 physics.py STATIC_AABBS 一致) ============
+  const WALL_TOP = 7.6;                               // 视点高于此(站上屋面)不再受墙阻挡
+  addCollider(8.2, 8.4, -4.6, 5.0, 0, WALL_TOP);      // 机房西墙
+  addCollider(18.8, 19.0, -4.6, 5.0, 0, WALL_TOP);    // 机房东墙
+  addCollider(8.2, 19.0, -4.6, -4.4, 0, WALL_TOP);    // 机房南墙
+  addCollider(8.2, 15.6, 4.8, 5.0, 0, WALL_TOP);      // 机房北墙西段 (门洞 15.6~18.6)
+  addCollider(18.6, 19.0, 4.8, 5.0, 0, WALL_TOP);     // 机房北墙东段
+  addCollider(9.35, 11.65, -3.25, 3.25, 0, WALL_TOP);   // 低压级撬块 (屋面上方不挡)
+  addCollider(12.65, 15.15, -3.65, 3.65, 0, WALL_TOP);  // 高压级撬块
+  addCollider(18.3, 18.8, 0.4, 4.0, 0, WALL_TOP);       // 控制柜排
+  addCollider(17.25, 18.55, -3.25, -1.95, 0, WALL_TOP); // 贮液器
+  // 屋面护栏 (仅对屋面上的玩家生效; 东侧在爬梯口 z0.9~1.9 留缺)
+  const RAIL_LO = 7.0;
+  addCollider(8.0, 8.3, -5.1, 5.2, RAIL_LO);          // 西边护栏
+  addCollider(8.0, 19.2, 4.9, 5.2, RAIL_LO);          // 北边护栏
+  addCollider(8.0, 19.2, -5.1, -4.8, RAIL_LO);        // 南边护栏
+  addCollider(18.9, 19.2, 1.9, 5.2, RAIL_LO);         // 东边护栏 (爬梯口北侧)
+  addCollider(18.9, 19.2, -5.1, 0.9, RAIL_LO);        // 东边护栏 (爬梯口南侧)
+  addCollider(10.7, 16.5, -1.8, 2.2, RAIL_LO);        // 屋顶蒸发冷本体
 }
 
 // ---------------------------------------------------------------- 现实感细节
@@ -1292,6 +1793,8 @@ let onGround = true;
 function canMoveTo(next) {
   const radius = 0.34;
   for (const c of colliders) {
+    if (c.minY !== undefined && next.y < c.minY) continue;
+    if (c.maxY !== undefined && next.y > c.maxY) continue;
     if (next.x + radius > c.minX && next.x - radius < c.maxX &&
         next.z + radius > c.minZ && next.z - radius < c.maxZ) return false;
   }
@@ -1327,19 +1830,41 @@ function updateMovement(delta) {
   controls.moveForward(-velocity.z * delta);
   if (!canMoveTo(obj.position)) obj.position.copy(afterX);
 
-  // 跳跃: 竖直速度积分 + 地面判定
+  // 爬梯 (机房东墙外检修直爬梯): 区域内 W 上爬 / S 下爬, 重力挂起
+  const p = obj.position;
+  const onLadder = p.x > 19.02 && p.x < 19.9 && p.z > 0.9 && p.z < 1.9;
+  if (onLadder) {
+    const climb = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
+    velY = 0;
+    p.y = Math.min(Math.max(p.y + climb * 2.6 * delta, EYE_HEIGHT), MR_ROOF_Y + EYE_HEIGHT + 0.1);
+    onGround = true;
+    return;
+  }
+
+  // 跳跃: 竖直速度积分 + 地面判定 (地面高度随所在屋面变化)
   if (keys.Space && onGround) {
     velY = JUMP_SPEED;
     onGround = false;
   }
   velY -= GRAVITY * delta;
-  let y = obj.position.y + velY * delta;
-  if (y <= EYE_HEIGHT) {
-    y = EYE_HEIGHT;
+  let y = p.y + velY * delta;
+  const groundY = groundHeightAt(p.x, p.z, p.y - EYE_HEIGHT) + EYE_HEIGHT;
+  if (y <= groundY) {
+    y = groundY;
     velY = 0;
     onGround = true;
   }
-  obj.position.y = y;
+  p.y = y;
+}
+
+// 可站立面高度: 只有当玩家脚底已在该面附近/之上时才生效,
+// 防止在室内(脚在地面)被"吸"上屋面。
+const MR_ROOF_Y = 6.18;
+function groundHeightAt(x, z, feetY) {
+  if (feetY > 5.5 && x > 8.15 && x < 19.05 && z > -4.65 && z < 5.05) return MR_ROOF_Y;   // 机房屋面
+  if (feetY > 5.4 && x > -7.15 && x < 7.15 && z > -13.15 && z < 5.15) return 6.09;       // 冷库顶板
+  if (feetY > 3.7 && x > -5.2 && x < 5.2 && z > 5.0 && z < 10.15) return 4.36;           // 穿堂顶板
+  return 0;
 }
 
 // ---------------------------------------------------------------- 动画循环
